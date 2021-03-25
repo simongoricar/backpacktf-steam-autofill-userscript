@@ -7,6 +7,7 @@
 // @version     1.0.0
 // @author      DefaultSimon
 // @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
+// @run-at      document-idle
 // ==/UserScript==
 
 /**
@@ -52,14 +53,17 @@ jQuery(function () {
     </style>`;
     jQuery(globalCss).appendTo("head");
 
-    // Gather all classifields on the page
-    const classifields = jQuery(".listing");
     const descriptionCurrencyRegex = /(\d+(?:\.\d+)?)\s?(keys?|ref)/ig;
 
-    // For each one, update the trade link to automatically add required currency
-    classifields.each(function (index, element) {
-        const JQElement = jQuery(element);
+    // Gather all classifields on the page
+    const orderColumns = jQuery(".media-list");
 
+    const sellOrders = jQuery(orderColumns[0]).find(".listing");
+    const buyOrders = jQuery(orderColumns[1]).find(".listing");
+    console.log(sellOrders);
+    console.log(buyOrders);
+
+    function processClassifield(JQElement, orderType) {
         let currencyString = JQElement.find(".tag.bottom-right span").text();
         let descriptionString = JQElement.find(".quote-box p").text();
 
@@ -162,12 +166,25 @@ jQuery(function () {
           ".listing-buttons a[href^='https://steamcommunity.com/tradeoffer/']"
         );
         const previousHref = tradeButton.attr("href");
-        tradeButton.attr("href", previousHref + "&enhancerAddCurrency=" + encodedCurrency)
+        const paramEnhancerAddType = orderType === "self" ? "Self" : "Other";
+
+        tradeButton.attr("href", `${previousHref}&enhancerAddCurrency${paramEnhancerAddType}=${encodedCurrency}`)
 
         // Make the trade button look slightly glowy
         tradeButton.addClass("bptf-enhancer-done");
 
-        console.log(totalCurrencyMap);
-        console.log("[" + encodedCurrency + "] " + descriptionString);
+        // console.log(totalCurrencyMap);
+        // console.log("[" + encodedCurrency + "] " + descriptionString);
+    }
+
+    // For each one, update the trade link to automatically add required currency
+    sellOrders.each(function (index, element) {
+        const JQElement = jQuery(element);
+        processClassifield(JQElement, "self");
     });
-})()
+
+    buyOrders.each(function (index, element) {
+        const JQElement = jQuery(element);
+        processClassifield(JQElement, "other");
+    });
+});

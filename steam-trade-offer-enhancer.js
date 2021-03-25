@@ -8,6 +8,7 @@
 // @author      HusKy, patches by DefaultSimon
 // @downloadURL https://forums.backpack.tf/topic/17946-script-steam-trade-offer-enhancer/
 // @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
+// @run-at      document-idle
 // ==/UserScript==
 
 /// CHANGELOG
@@ -461,6 +462,9 @@ jQuery(function () {
             .autoadd-status-container .status.done {
                 color: rgb(51,191,41);
             }
+            .autoadd-status-container .status.done-error {
+                color: rgb(186,191,41);
+            }
         </style>`;
     jQuery(style).appendTo("head");
 
@@ -650,10 +654,10 @@ jQuery(function () {
         // Combine with an external bptf script for maximum efficiency ;)
         const currencyTypeToSearchTermMap = {
             // Search terms to filter to just the keys
-            "key": "Mann Co. Supply Crate Key Tool",
-            "ref": "Refined Metal Craft Item",
-            "rec": "Reclaimed Metal Craft Item",
-            "scrap": "Scrap Metal Craft Item",
+            "key": "Mann Co. Supply Crate Key Level 5 Tool",
+            "ref": "Refined Metal Level 3 Craft Item",
+            "rec": "Reclaimed Metal Level 2 Craft Item",
+            "scrap": "Scrap Metal Level 1 Craft Item",
         };
         // TODO allow for e.g. "4.33ref" (though this is handled by the bptf integration anyway)
 
@@ -671,7 +675,7 @@ jQuery(function () {
                 rec: 0,
                 scrap: 0,
             };
-            let erroredDuringLoad = false;
+            let hadMissingCurrencyDuringLoad = false;
 
             function autoAddSetUp() {
                 let filterContainer = jQuery(".filter_ctn");
@@ -694,7 +698,7 @@ jQuery(function () {
                   .text("in-progress")
             }
 
-            function autoAddError() {
+            function constructMissingCurrencyString () {
                 const missingCurrencyArray = [];
                 for (let [key, value] of Object.entries(missingCurrencyAmount)) {
                     if (value > 0) {
@@ -702,34 +706,48 @@ jQuery(function () {
                     }
                 }
 
+                return missingCurrencyArray.join(", ");
+            }
+
+            function autoAddError() {
                 jQuery(".autoadd-status-container .status")
                   .removeClass("waiting in-progress done")
                   .addClass("error")
-                  .text(`not enough items (missing ${missingCurrencyArray.join(", ")})!`);
+                  .text(`not enough items (missing ${constructMissingCurrencyString()})!`);
             }
 
             function autoAddFinish() {
-                // Clear the search bar
-                setItemSearchAndUpdate("");
                 // Update the status
-                jQuery(".autoadd-status-container .status")
-                  .removeClass("in-progress")
-                  .addClass("done")
-                  .text("done")
+                if (hadMissingCurrencyDuringLoad) {
+                    jQuery(".autoadd-status-container .status")
+                      .removeClass("in-progress error")
+                      .addClass("done-error")
+                      .text(`done (missing ${constructMissingCurrencyString()})!`)
+                } else {
+                    jQuery(".autoadd-status-container .status")
+                      .removeClass("in-progress")
+                      .addClass("done")
+                      .text("done")
+                }
+
                 // Renable the search bar
                 jQuery(".filter_control_ctn input").prop("disabled", false);
                 // Show the bump animation
                 jQuery(".filter_control_ctn").addClass("finishedAnimation");
             }
 
-            function processNextMatch(array, index, finishedCallback) {
+            function processNextMatch(array, index, signalFinishedOnEnd, finishedCallback) {
                 if (index >= array.length) {
-                    if (!erroredDuringLoad) {
+                    if (signalFinishedOnEnd) {
+                        // Clear the search bar
+                        setItemSearchAndUpdate("");
                         autoAddFinish();
                     }
+
                     if (finishedCallback) {
                         finishedCallback();
                     }
+
                     return;
                 }
 
@@ -737,7 +755,7 @@ jQuery(function () {
                     let matched = array[index].match(currencyRegex);
                     if (matched === null || matched.length !== 3) {
                         console.warn("Format was not recognized: " + array[index]);
-                        return processNextMatch(array, index + 1, finishedCallback);
+                        return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
                     let currencyAmount = parseInt(matched[1]);
@@ -746,7 +764,7 @@ jQuery(function () {
                     let searchTerm = currencyTypeToSearchTermMap[currencyType];
                     if (searchTerm === undefined) {
                         console.warn("Format was not recognized: " + array[index]);
-                        return processNextMatch(array, index + 1, finishedCallback);
+                        return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
                     setItemSearchAndUpdate(searchTerm);
@@ -758,23 +776,24 @@ jQuery(function () {
                             let missingAmount = currencyAmount - inventoryLoadedItems.length;
                             missingCurrencyAmount[currencyType] += missingAmount;
 
-                            erroredDuringLoad = true;
+                            hadMissingCurrencyDuringLoad = true;
                             autoAddError();
                         }
 
                         // Move items
-                        for (let i = 0; i < currencyAmount; i++) {
+                        const itemAmountToAdd = Math.min(currencyAmount, inventoryLoadedItems.length);
+                        for (let i = 0; i < itemAmountToAdd; i++) {
                             setTimeout(MoveItemToTrade, i * 50, inventoryLoadedItems[i]);
                         }
 
                         setTimeout(function () {
                             tradeOfferWindow.summarise();
-                            return processNextMatch(array, index + 1, finishedCallback);
+                            return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                         }, currencyAmount * 50 + 500);
                     }, 1000);
                 } catch (e) {
                     console.error("Something went wrong while automatically adding currency: " + e);
-                    return processNextMatch(array, index + 1, finishedCallback);
+                    return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                 }
             }
 
@@ -809,20 +828,20 @@ jQuery(function () {
 
                     // TODO Might want to look into doing this with promises, this is absolutely unreadable
                     // For any poor soul reading this: this just pops two elements from the tasks array
-                    // and runs processNextMatch on them.
+                    // and runs processNextMatch on them with slightly altered arguments.
                     autoAddInProgress();
                     const nextTask = tasks.pop();
                     if (nextTask) {
                         const [taskArray, func] = nextTask;
                         func();
 
-                        processNextMatch(taskArray, 0, function () {
+                        processNextMatch(taskArray, 0, false, function () {
                             const nextTask = tasks.pop();
                             if (nextTask) {
                                 const [taskArray, func] = nextTask;
                                 func();
 
-                                processNextMatch(taskArray, 0);
+                                processNextMatch(taskArray, 0, true);
                             }
                         });
                     }
@@ -832,9 +851,9 @@ jQuery(function () {
             inventoriesAvailableObserver.observe(
                 inventoriesElement,
                 {
-                        attributes: true,
-                        attributeFilter: ["style"]
-                    }
+                    attributes: true,
+                    attributeFilter: ["style"]
+                }
             )
 
         }

@@ -423,6 +423,27 @@ jQuery(function () {
                 margin-left: 1px;
                 min-height: 20px;
             }
+            
+            @keyframes autoAddFinished {
+                0% { transform: scale(1) }
+                60% { transform: scale(1.1) }
+                100% { transform: scale(1) }
+            }
+            
+            .filter_control_ctn.finishedAnimation {
+                animation-name: autoAddFinished;
+                animation-fill-mode: forwards;
+                animation-iteration-count: 3;
+                animation-timing-function: cubic-bezier(0.75, 0.25, 0.44, 0.87);
+                animation-duration: .35s;
+            }
+            
+            .autoadd-status {
+                font-size: 0.9rem;
+                margin-left: 1px;
+                position: relative;
+                top: 6px;
+            }
         </style>`;
     jQuery(style).appendTo("head");
 
@@ -620,18 +641,17 @@ jQuery(function () {
             "rec": "Reclaimed Metal Craft Item",
             "scrap": "Scrap Metal Craft Item",
         };
-        // TODO allow for e.g. "4.33ref"
+        // TODO allow for e.g. "4.33ref" (though this is handled by the bptf integration anyway)
 
         const enhancerAddCurrencyParam = getUrlParameter("enhancerAddCurrency");
         if (enhancerAddCurrencyParam !== null) {
-            console.log("enhancerAddCurrency is present, waiting...");
             const paramArray = enhancerAddCurrencyParam.split(",");
             const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
 
             function setUpAutoAdd() {
                 let filterContainer = jQuery(".filter_ctn");
                 filterContainer.append(
-                  "<span class='enhanced-status' style='font-size: 0.9rem; margin: 6px 0 0 1px'>Auto-add currency: <i>waiting for page load</i></span>"
+                  "<span class='autoadd-status'>Auto-adding currency: <b style='color: rgb(135,159,203)'>waiting for page load</b></span>"
                 )
 
                 // Also disable the search bar so the user can't accidentally type something
@@ -640,21 +660,23 @@ jQuery(function () {
 
             function inProgressAutoAdd() {
                 // Update the status
-                jQuery(".enhanced-status").html("Auto-add currency: <i>in-progress</i>")
+                jQuery(".autoadd-status").html("Auto-add currency: <b style='color: rgb(210,170,255)'>in-progress</b>")
             }
 
-            function cleanUpAutoAdd() {
+            function finishAutoAdd() {
                 // Clear the search bar
                 setItemSearchAndUpdate("");
                 // Update the status
-                jQuery(".enhanced-status").html("Auto-add currency: <i>done</i>")
+                jQuery(".autoadd-status").html("Auto-add currency: <b style='color: rgb(51,191,41)'>done</b>")
                 // Renable the search bar
                 jQuery(".filter_control_ctn input").prop("disabled", false);
+                // Show the bump animation
+                jQuery(".filter_control_ctn").addClass("finishedAnimation");
             }
 
             function processNextMatch(index) {
                 if (index >= paramArray.length) {
-                    cleanUpAutoAdd();
+                    finishAutoAdd();
                     return;
                 }
 
@@ -692,6 +714,7 @@ jQuery(function () {
 
             setUpAutoAdd();
             setTimeout(function () {
+                console.log("\"enhancerAddCurrency\" is present, running.");
                 inProgressAutoAdd();
                 processNextMatch(0);
             }, 1200);

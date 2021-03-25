@@ -4,22 +4,41 @@
 // @description Browser script to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.4.2
-// @author      HusKy
+// @version     1.4.2-patch1
+// @author      HusKy, patches by DefaultSimon
+// @downloadURL https://forums.backpack.tf/topic/17946-script-steam-trade-offer-enhancer/
+// @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
 // ==/UserScript==
 
+/// CHANGELOG
+// 1.4.2-patch1
+//     - fixed JS warnings
+//     - some refactoring
+//     - added "enhancerAddCurrency" url parameter to allow automatically adding currency on your side
+//       Useful with the "backpack.tf Trade Offer Enhancer integration".
+///
+
 function getUrlParam(paramName) {
-    var params = window.location.search.split(/\?|\&/);
-    for(i = 0; i < params.length; i++) {
-        var currentParam = params[i].split("=");
-        if(currentParam[0] === paramName) {
+    let params = window.location.search.split(/\?|\&/);
+    for (let i = 0; i < params.length; i++) {
+        let currentParam = params[i].split("=");
+        if (currentParam[0] === paramName) {
             return currentParam[1];
         }
     }
 }
 
+function setItemSearchAndUpdate(searchTerm) {
+    // Set the input value
+    jQuery("#filter_control").val(searchTerm)
+
+    // Trigger UI update
+    let keyupEvent = new Event("keyup");
+    document.getElementById("filter_control").dispatchEvent(keyupEvent);
+}
+
 // array of dangerous descriptions
-var dangerous_descriptions = [
+let dangerous_descriptions = [
     {
         tag: "uncraftable",
         description: "Not Usable in Crafting"
@@ -31,27 +50,27 @@ var dangerous_descriptions = [
 ];
 
 // array of rare TF2 keys (defindexes)
-var rare_TF2_keys = [
+let rare_TF2_keys = [
     "5049", "5067", "5072", "5073",
     "5079", "5081", "5628", "5631",
     "5632", "5713", "5716", "5717",
     "5762"
 ];
 
-var tradeOfferPage = {
-    evaluate_items: function(items) {
-        var result = {};
+let tradeOfferPage = {
+    evaluate_items: function (items) {
+        let result = {};
 
         result._total = items.find("div.trade_item").length;
 
-        items.find("div.trade_item").each(function() {
-            var img = jQuery(this).find("img").attr("src");
-            var quality = jQuery(this).css("border-top-color");
+        items.find("div.trade_item").each(function () {
+            let img = jQuery(this).find("img").attr("src");
+            let quality = jQuery(this).css("border-top-color");
 
-            if(result[img] === undefined)
+            if (result[img] === undefined)
                 result[img] = {};
 
-            if(result[img][quality] === undefined) {
+            if (result[img][quality] === undefined) {
                 result[img][quality] = 1;
             } else {
                 result[img][quality]++;
@@ -61,17 +80,22 @@ var tradeOfferPage = {
         return result;
     },
 
-    dump_summary: function(tradeoffer, type, items) {
-        if(items._total <= 0) return;
+    dump_summary: function (tradeoffer, type, items) {
+        if (items._total <= 0) return;
 
-        var htmlstring = "Summary (" + items._total + " " + (items._total === 1 ? "item" : "items") + "):<br>";
+        let htmlstring = "Summary (" + items._total + " " + (items._total === 1 ? "item" : "items") + "):<br>";
 
-        for(var prop in items) {
-            if(prop === "_total") continue;
+        for (let prop in items) {
+            if (prop === "_total") continue;
 
-            var item_type = items[prop];
-            for(var quality in item_type) {
-                htmlstring += "<span class=\"summary_item\" style=\"background-image: url('" + prop + "'); border-color: " + quality + ";\"><span class=\"summary_badge\">" + item_type[quality] + "</span></span>";
+            let item_type = items[prop];
+            for (let quality in item_type) {
+                htmlstring +=
+                  "<span " +
+                  "class=\"summary_item\" " +
+                  "style=\"background-image: url('" + prop + "'); border-color: " + quality + ";\">" +
+                  "<span class=\"summary_badge\">" + item_type[quality] + "</span>" +
+                  "</span>";
             }
         }
 
@@ -80,87 +104,87 @@ var tradeOfferPage = {
           .after("<div class=\"tradeoffer_items_summary\">" + htmlstring + "</div>");
     },
 
-    attach_links: function(tradeoffer) {
-        var avatar = tradeoffer.find("div.tradeoffer_items.primary").find("a.tradeoffer_avatar");
+    attach_links: function (tradeoffer) {
+        let avatar = tradeoffer.find("div.tradeoffer_items.primary").find("a.tradeoffer_avatar");
 
-        if(avatar.length > 0) {
-            var profileUrl = avatar.attr("href").match(/^https?:\/\/steamcommunity\.com\/(id|profiles)\/(.*)/);
-            if(profileUrl) {
+        if (avatar.length > 0) {
+            let profileUrl = avatar.attr("href").match(/^https?:\/\/steamcommunity\.com\/(id|profiles)\/(.*)/);
+            if (profileUrl) {
                 tradeoffer.find("div.tradeoffer_footer_actions").append(" | <a class='whiteLink' target='_blank' href='http://rep.tf/" + profileUrl[2] + "'>rep.tf</a>");
             }
         }
     }
 };
 
-var tradeOfferWindow = {
-    evaluate_items: function(items) {
-        var result = {};
+let tradeOfferWindow = {
+    evaluate_items: function (items) {
+        let result = {};
         result._total = 0;
         result._warnings = [];
 
-        var slot_inner = items.find("div.slot_inner");
+        let slot_inner = items.find("div.slot_inner");
 
-        slot_inner.each(function() {
-            if(jQuery(this).html() !== "" && jQuery(this).html() !== null) {
+        slot_inner.each(function () {
+            if (jQuery(this).html() !== "" && jQuery(this).html() !== null) {
                 result._total++;
-                var item = jQuery(this).find("div.item");
+                let item = jQuery(this).find("div.item");
 
-                var img = item.find("img").attr("src");
-                var quality = item.css("border-top-color");
+                let img = item.find("img").attr("src");
+                let quality = item.css("border-top-color");
 
-                if(result[img] === undefined)
+                if (result[img] === undefined)
                     result[img] = {};
 
-                if(result[img][quality] === undefined) {
+                if (result[img][quality] === undefined) {
                     result[img][quality] = 1;
                 } else {
                     result[img][quality]++;
                 }
 
                 // let's check item's info
-                var appid = item[0].id.split("_")[0].replace("item", "");
-                var contextid = item[0].id.split("_")[1];
-                var assetid = item[0].id.split("_")[2];
+                let appid = item[0].id.split("_")[0].replace("item", "");
+                let contextid = item[0].id.split("_")[1];
+                let assetid = item[0].id.split("_")[2];
 
-                var inventory_item;
-                if(items[0].id === "your_slots")
+                let inventory_item;
+                if (items[0].id === "your_slots")
                     inventory_item = unsafeWindow.g_rgAppContextData[appid].rgContexts[contextid]
                       .inventory.rgInventory[assetid];
                 else
                     inventory_item = unsafeWindow.g_rgPartnerAppContextData[appid].rgContexts[contextid]
                       .inventory.rgInventory[assetid];
 
-                var descriptions = inventory_item.descriptions;
-                var appdata = inventory_item.app_data;
-                var fraudwarnings = inventory_item.fraudwarnings;
+                let descriptions = inventory_item.descriptions;
+                let appdata = inventory_item.app_data;
+                let fraudwarnings = inventory_item.fraudwarnings;
 
-                var warning_text;
+                let warning_text;
 
-                if(typeof descriptions === "object") {
-                    descriptions.forEach(function(d1) {
-                        dangerous_descriptions.forEach(function(d2) {
-                            if(d1.value.indexOf(d2.description) > -1) {
-                                var warning_text = "Offer contains " + d2.tag + " item(s).";
-                                if(result._warnings.indexOf(warning_text) === -1)
+                if (typeof descriptions === "object") {
+                    descriptions.forEach(function (d1) {
+                        dangerous_descriptions.forEach(function (d2) {
+                            if (d1.value.indexOf(d2.description) > -1) {
+                                let warning_text = "Offer contains " + d2.tag + " item(s).";
+                                if (result._warnings.indexOf(warning_text) === -1)
                                     result._warnings.push(warning_text);
                             }
                         });
                     });
                 }
 
-                if(typeof appdata === "object" && typeof appdata.def_index === "string") {
-                    if(rare_TF2_keys.indexOf(appdata.def_index) > -1) {
+                if (typeof appdata === "object" && typeof appdata.def_index === "string") {
+                    if (rare_TF2_keys.indexOf(appdata.def_index) > -1) {
                         warning_text = "Offer contains rare TF2 key(s).";
-                        if(result._warnings.indexOf(warning_text) === -1)
+                        if (result._warnings.indexOf(warning_text) === -1)
                             result._warnings.push(warning_text);
                     }
                 }
 
-                if(typeof fraudwarnings === "object") {
-                    fraudwarnings.forEach(function(text) {
-                        if(text.indexOf("restricted gift") > -1) {
+                if (typeof fraudwarnings === "object") {
+                    fraudwarnings.forEach(function (text) {
+                        if (text.indexOf("restricted gift") > -1) {
                             warning_text = "Offer contains restricted gift(s).";
-                            if(result._warnings.indexOf(warning_text) === -1)
+                            if (result._warnings.indexOf(warning_text) === -1)
                                 result._warnings.push(warning_text);
                         }
                     });
@@ -172,28 +196,28 @@ var tradeOfferWindow = {
         return result;
     },
 
-    dump_summary: function(target, type, items) {
-        if(items._total <= 0) return;
+    dump_summary: function (target, type, items) {
+        if (items._total <= 0) return;
 
-        var htmlstring = type + " summary (" + items._total + " " + (items._total === 1 ? "item" : "items") + "):<br>";
+        let htmlstring = type + " summary (" + items._total + " " + (items._total === 1 ? "item" : "items") + "):<br>";
 
         // item counts
-        for(var prop in items) {
-            if(prop.indexOf("_") === 0) continue;
+        for (let prop in items) {
+            if (prop.indexOf("_") === 0) continue;
 
-            var item_type = items[prop];
-            for(var quality in item_type) {
+            let item_type = items[prop];
+            for (let quality in item_type) {
                 htmlstring += "<span class=\"summary_item\" style=\"background-image: url('" + prop + "'); border-color: " + quality + ";\"><span class=\"summary_badge\">" + item_type[quality] + "</span></span>";
             }
         }
 
         // warnings
-        if(items._warnings.length > 0) {
+        if (items._warnings.length > 0) {
             htmlstring += "<span class=\"warning\"><br>Warning:<br>";
-            items._warnings.forEach(function(warning, index) {
+            items._warnings.forEach(function (warning, index) {
                 htmlstring += warning;
 
-                if(index < items._warnings.length - 1) {
+                if (index < items._warnings.length - 1) {
                     htmlstring += "<br>";
                 }
             });
@@ -203,60 +227,60 @@ var tradeOfferWindow = {
         target.append(htmlstring);
     },
 
-    summarise: function() {
-        var target = jQuery("div.tradeoffer_items_summary");
+    summarise: function () {
+        let target = jQuery("div.tradeoffer_items_summary");
         target.html("");
 
-        var mine = jQuery("div#your_slots");
-        var other = jQuery("div#their_slots");
+        let mine = jQuery("div#your_slots");
+        let other = jQuery("div#their_slots");
 
-        var my_items = this.evaluate_items(mine);
-        var other_items = this.evaluate_items(other);
+        let my_items = this.evaluate_items(mine);
+        let other_items = this.evaluate_items(other);
 
         this.dump_summary(target, "My", my_items);
-        if(other_items._total > 0) target.append("<br><br>");
+        if (other_items._total > 0) target.append("<br><br>");
         this.dump_summary(target, "Their", other_items);
     },
 
-    init: function() {
-        var self = this;
+    init: function () {
+        let self = this;
 
         // something is loading
-        var isReady = jQuery("img[src$='throbber.gif']:visible").length <= 0;
+        let isReady = jQuery("img[src$='throbber.gif']:visible").length <= 0;
 
         // our partner's inventory is also loading at this point
-        var itemParamExists = getUrlParam("for_item") !== undefined;
-        var hasBeenLoaded = true;
+        let itemParamExists = getUrlParam("for_item") !== undefined;
+        let hasBeenLoaded = true;
 
-        if(itemParamExists) {
+        if (itemParamExists) {
             // format: for_item=<appId>_<contextId>_<itemId>
-            var item = getUrlParam("for_item").split("_");
+            let item = getUrlParam("for_item").split("_");
             hasBeenLoaded = jQuery("div#inventory_" + UserThem.strSteamId + "_" + item[0] + "_" + item[1]).length > 0;
         }
 
-        if(isReady && (!itemParamExists || hasBeenLoaded)) {
-            setTimeout(function() {
+        if (isReady && (!itemParamExists || hasBeenLoaded)) {
+            setTimeout(function () {
                 self.summarise();
             }, 500);
 
             return;
         }
 
-        if(itemParamExists && hasBeenLoaded) {
+        if (itemParamExists && hasBeenLoaded) {
             setTimeout(self.deadItem.bind(self), 5000);
             return;
         }
 
-        setTimeout(function() {
+        setTimeout(function () {
             self.init();
         }, 250);
     },
 
-    deadItem: function() {
-        var deadItemExists = jQuery("a[href$='_undefined']").length > 0;
-        var item = getUrlParam("for_item").split("_");
+    deadItem: function () {
+        let deadItemExists = jQuery("a[href$='_undefined']").length > 0;
+        let item = getUrlParam("for_item").split("_");
 
-        if(deadItemExists) {
+        if (deadItemExists) {
             unsafeWindow.g_rgCurrentTradeStatus.them.assets = [];
             RefreshTradeStatus(g_rgCurrentTradeStatus, true);
             alert("Seems like the item you are looking to buy (ID: " + item[2] + ") is no longer available. You should check other user's backpack and see if it's still there.");
@@ -266,28 +290,28 @@ var tradeOfferWindow = {
         }
     },
 
-    clear: function(slots) {
-        var timeout = 100;
+    clear: function (slots) {
+        let timeout = 100;
 
-        var added_items = jQuery(slots);
-        var items = added_items.find("div.itemHolder").find("div.item");
+        let added_items = jQuery(slots);
+        let items = added_items.find("div.itemHolder").find("div.item");
 
-        for(i = 0; i < items.length; i++) {
+        for (i = 0; i < items.length; i++) {
             setTimeout(MoveItemToInventory, i * timeout, items[i]);
         }
 
-        setTimeout(function() {
+        setTimeout(function () {
             tradeOfferWindow.summarise();
         }, items.length * timeout + 500);
     }
 };
 
-jQuery(function() {
+// Executed on page load
+jQuery(function () {
+    let location = window.location.pathname;
 
-    var location = window.location.pathname;
-
-// Append CSS style.
-    var style = "<style type='text/css'>" +
+    // Append CSS style.
+    let style = "<style type='text/css'>" +
       ".tradeoffer_items_summary { color: #fff; font-size: 10px; }" +
       ".warning { color: #ff4422; }" +
       ".info { padding: 1px 3px; border-radius: 4px; background-color: #1155FF; border: 1px solid #003399; font-size: 14px; }" +
@@ -297,20 +321,20 @@ jQuery(function() {
       "</style>";
     jQuery(style).appendTo("head");
 
-// Trade offer page with multiple trade offers ...
-    if(location.indexOf("tradeoffers") > -1) {
+    // Trade offer page with multiple trade offers ...
+    if (location.indexOf("tradeoffers") > -1) {
 
         // Retrieve all trade offers.
-        var trade_offers = jQuery("div.tradeoffer");
+        let trade_offers = jQuery("div.tradeoffer");
 
-        if(trade_offers.length > 0) {
-            trade_offers.each(function() {
-                var others = jQuery(this).find("div.primary > div.tradeoffer_item_list");
-                var mine = jQuery(this).find("div.secondary > div.tradeoffer_item_list");
+        if (trade_offers.length > 0) {
+            trade_offers.each(function () {
+                let others = jQuery(this).find("div.primary > div.tradeoffer_item_list");
+                let mine = jQuery(this).find("div.secondary > div.tradeoffer_item_list");
 
                 // Evaluate both sides.
-                var other_items = tradeOfferPage.evaluate_items(others);
-                var my_items = tradeOfferPage.evaluate_items(mine);
+                let other_items = tradeOfferPage.evaluate_items(others);
+                let my_items = tradeOfferPage.evaluate_items(mine);
 
                 // Dump the summaries somewhere ...
                 tradeOfferPage.dump_summary(jQuery(this), "primary", other_items);
@@ -318,19 +342,19 @@ jQuery(function() {
 
                 // Check if trade offer is "unavailable"
                 // Do this only for /tradeoffers page and nothing else
-                var is_ok = location.indexOf("tradeoffers", location.length - "tradeoffers".length) !== -1;
+                let is_ok = location.indexOf("tradeoffers", location.length - "tradeoffers".length) !== -1;
                 is_ok = is_ok || location.indexOf("tradeoffers/", location.length - "tradeoffers/".length) !== -1;
 
-                if(is_ok) {
+                if (is_ok) {
                     // Attach links
                     tradeOfferPage.attach_links(jQuery(this));
 
-                    var is_unavailable = jQuery(this).find("div.tradeoffer_items_banner").text().indexOf("Items Now Unavailable For Trade") > -1;
-                    if(is_unavailable) {
-                        var trade_offer_id = jQuery(this).attr("id").split("_")[1];
-                        var footer = jQuery(this).find("div.tradeoffer_footer");
+                    let is_unavailable = jQuery(this).find("div.tradeoffer_items_banner").text().indexOf("Items Now Unavailable For Trade") > -1;
+                    if (is_unavailable) {
+                        let trade_offer_id = jQuery(this).attr("id").split("_")[1];
+                        let footer = jQuery(this).find("div.tradeoffer_footer");
 
-                        var text = "<span class=\"info\">This trade offer is stuck and invalid, but you can still <strong>decline</strong> it.</span>";
+                        let text = "<span class=\"info\">This trade offer is stuck and invalid, but you can still <strong>decline</strong> it.</span>";
                         footer.prepend("<div class=\"tradeoffer_footer_actions\"><a class=\"whiteLink\" href=\"javascript:DeclineTradeOffer('" + trade_offer_id + "');\">" + text + "</a></div>");
                     }
                 }
@@ -338,7 +362,7 @@ jQuery(function() {
         }
 
         // Single trade offer window ...
-    } else if(location.indexOf("tradeoffer") > -1) {
+    } else if (location.indexOf("tradeoffer") > -1) {
 
         // Append new divs ...
         jQuery("div.trade_left div.trade_box_contents").append("<div class=\"trade_rule selectableNone\"/><div class=\"item_adder\"/>");
@@ -351,17 +375,17 @@ jQuery(function() {
         jQuery("div.trade_left div.trade_box_contents").append("<div class=\"trade_rule selectableNone\"/><div class=\"tradeoffer_items_summary\"/>");
 
         // Refresh summaries whenever ...
-        jQuery("body").click(function() {
-            setTimeout(function() {
+        jQuery("body").click(function () {
+            setTimeout(function () {
                 tradeOfferWindow.summarise();
             }, 500);
         });
 
         // hack to fix empty space under inventory
         // TODO get rid of this if they ever fix it
-        setInterval(function() {
-            if(jQuery("#inventory_displaycontrols").height() > 50) {
-                if(jQuery("div#inventories").css("marginBottom") === "8px") {
+        setInterval(function () {
+            if (jQuery("#inventory_displaycontrols").height() > 50) {
+                if (jQuery("div#inventories").css("marginBottom") === "8px") {
                     jQuery("div#inventories").css("marginBottom", "7px");
                 } else {
                     jQuery("div#inventories").css("marginBottom", "8px");
@@ -370,66 +394,162 @@ jQuery(function() {
         }, 500);
 
         // Handle item auto adder
-        jQuery("button#btn_additems").click(function() {
+        jQuery("button#btn_additems").click(function () {
             // Do not add items if the offer cannot be modified
-            if(jQuery("div.modify_trade_offer:visible").length > 0) return;
+            if (jQuery("div.modify_trade_offer:visible").length > 0) return;
 
             // Collect all items
-            var inventory = jQuery("div.inventory_ctn:visible");
-            var items = inventory.find("div.itemHolder").filter(function() {
+            let inventory = jQuery("div.inventory_ctn:visible");
+            let items = inventory.find("div.itemHolder").filter(function () {
                 return jQuery(this).css("display") !== "none";
-            }).find("div.item").filter(function() {
+            }).find("div.item").filter(function () {
                 return jQuery(this).css("display") !== "none";
             });
 
             // Get amount value
-            var amount = parseInt(jQuery("input#amount_control").val());
-            if(isNaN(amount)) amount = 16;
-            if(items.length < amount) amount = items.length;
+            let amount = parseInt(jQuery("input#amount_control").val());
+            if (isNaN(amount)) amount = 16;
+            if (items.length < amount) amount = items.length;
 
             // Add all items
-            for(i = 0; i < amount; i++) {
+            for (i = 0; i < amount; i++) {
                 setTimeout(MoveItemToTrade, i * 50, items[i]);
             }
 
             // Refresh summaries
-            setTimeout(function() {
+            setTimeout(function () {
                 tradeOfferWindow.summarise();
             }, amount * 50 + 500);
         });
 
-        jQuery("button#btn_clearmyitems").click(function() {
+        jQuery("button#btn_clearmyitems").click(function () {
             tradeOfferWindow.clear("div#your_slots");
         });
 
-        jQuery("button#btn_cleartheiritems").click(function() {
+        jQuery("button#btn_cleartheiritems").click(function () {
             tradeOfferWindow.clear("div#their_slots");
         });
 
         tradeOfferWindow.init();
 
-        var itemParam = getUrlParam("for_item");
-        if(itemParam !== undefined) {
-            var item = itemParam.split("_");
+        let itemParam = getUrlParam("for_item");
+        if (itemParam !== undefined) {
+            let item = itemParam.split("_");
 
             unsafeWindow.g_rgCurrentTradeStatus.them.assets.push({
-                "appid":item[0],
-                "contextid":item[1],
-                "assetid":item[2],
-                "amount":1
+                "appid": item[0],
+                "contextid": item[1],
+                "assetid": item[2],
+                "amount": 1
             });
 
             RefreshTradeStatus(g_rgCurrentTradeStatus, true);
         }
 
-        if(unsafeWindow.g_daysMyEscrow > 0) {
-            var hours = unsafeWindow.g_daysMyEscrow * 24;
-            jQuery("div.trade_partner_headline").append("<div class='warning'>(You do not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>")
+        if (unsafeWindow.g_daysMyEscrow > 0) {
+            let hours = unsafeWindow.g_daysMyEscrow * 24;
+            jQuery("div.trade_partner_headline").append("<div class='warning'>(You do not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>");
         }
 
-        if(unsafeWindow.g_daysTheirEscrow > 0) {
-            var hours = unsafeWindow.g_daysTheirEscrow * 24;
-            jQuery("div.trade_partner_headline").append("<div class='warning'>(Other user does not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>")
+        if (unsafeWindow.g_daysTheirEscrow > 0) {
+            let hours = unsafeWindow.g_daysTheirEscrow * 24;
+            jQuery("div.trade_partner_headline").append("<div class='warning'>(Other user does not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>");
+        }
+
+
+
+        /// Patch 1
+        // Add url parameter to automatically add some currency on your side
+        // The parameter is named "enhancerAddCurrency" and the format is:
+        //     comma-separated currencies, e.g. "...&enhancerAddCurrency=1key,3.44ref&..."
+        //     Supported currencies: "key", "ref", "rec", "scrap"
+        //
+        // Usage: loading the tradeoffer page with this parameter set will add
+        // the specified amount of currency to your side automatically.
+        // Combine with an external bptf script for maximum efficiency ;)
+        const currencyTypeToSearchTermMap = {
+            // Search terms to filter to just the keys
+            "key": "Mann Co. Supply Crate Key Tool",
+            "keys": "Mann Co. Supply Crate Key Tool",
+            "ref": "Refined Metal Craft Item",
+            "rec": "Reclaimed Metal Craft Item",
+            "scrap": "Scrap Metal Craft Item",
+        };
+
+        const enhancerAddCurrencyParam = getUrlParam("enhancerAddCurrency");
+
+        if (enhancerAddCurrencyParam !== undefined) {
+            console.log("enhancerAddCurrency is present, waiting...");
+            const paramArray = enhancerAddCurrencyParam.split(",");
+            const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
+
+            function setUpAutoAdd() {
+                let filterContainer = jQuery(".filter_ctn");
+                filterContainer.append(
+                  "<span class='enhanced-status' style='font-size: 0.9rem; margin: 6px 0 0 1px'>Auto-add currency: <i>waiting for page load</i></span>"
+                )
+
+                // Also disable the search bar so the user can't accidentally type something
+                jQuery(".filter_control_ctn input").prop("disabled", true);
+            }
+
+            function inProgressAutoAdd() {
+                // Update the status
+                jQuery(".enhanced-status").html("Auto-add currency: <i>in-progress</i>")
+            }
+
+            function cleanUpAutoAdd() {
+                // Clear the search bar
+                setItemSearchAndUpdate("");
+                // Update the status
+                jQuery(".enhanced-status").html("Auto-add currency: <i>done</i>")
+                // Renable the search bar
+                jQuery(".filter_control_ctn input").prop("disabled", false);
+            }
+
+            function processNextMatch(index) {
+                if (index >= paramArray.length) {
+                    cleanUpAutoAdd();
+                    return;
+                }
+
+                try {
+                    let matched = paramArray[index].match(currencyRegex);
+                    if (matched === null || matched.length !== 3) {
+                        console.warn("Format was not recognized: " + paramArray[index]);
+                        return processNextMatch(index + 1);
+                    }
+
+                    let currencyAmount = matched[1];
+                    let currencyType = matched[2];
+
+                    let searchTerm = currencyTypeToSearchTermMap[currencyType];
+                    if (searchTerm === undefined) {
+                        console.warn("Format was not recognized: " + paramArray[i]);
+                        return processNextMatch(index + 1);
+                    }
+
+                    setItemSearchAndUpdate(searchTerm);
+                    setTimeout(function () {
+                        // Set amount of such items and trigger the click
+                        jQuery("input#amount_control").val(currencyAmount);
+                        jQuery("button#btn_additems").trigger("click");
+
+                        setTimeout(function () {
+                            return processNextMatch(index + 1);
+                        }, currencyAmount * 50 + 500);
+                    }, 1000);
+                } catch (e) {
+                    console.error("Something went wrong while automatically adding currency: " + e);
+                    return processNextMatch(index + 1);
+                }
+            }
+
+            setUpAutoAdd();
+            setTimeout(function () {
+                inProgressAutoAdd();
+                processNextMatch(0);
+            }, 1200);
         }
     }
 

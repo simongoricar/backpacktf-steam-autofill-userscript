@@ -458,6 +458,8 @@ jQuery(function () {
                 <button id="btn_clearmyitems" type="button" class="btn_custom">Clear my items</button>
                 <button id="btn_cleartheiritems" type="button" class="btn_custom">Clear their items</button>
             </div>
+            <div class="trade_rule selectableNone"></div>
+            <div class="tradeoffer_items_summary"></div>
         `);
 
         // Refresh summaries whenever ...

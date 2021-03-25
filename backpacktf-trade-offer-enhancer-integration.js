@@ -49,7 +49,7 @@ jQuery(function () {
         border-color: rgb(32,158,108);
         box-shadow: rgb(17,112,74) 1px -1px 10px -4px;
     }
-    </style>`
+    </style>`;
     jQuery(globalCss).appendTo("head");
 
     // Gather all classifields on the page

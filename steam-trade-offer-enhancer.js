@@ -651,7 +651,7 @@ jQuery(function () {
             function setUpAutoAdd() {
                 let filterContainer = jQuery(".filter_ctn");
                 filterContainer.append(
-                  "<span class='autoadd-status'>Auto-adding currency: <b style='color: rgb(135,159,203)'>waiting for page load</b></span>"
+                  "<span class='autoadd-status'>Auto-adding currency: <b style='color: rgb(135,159,203)'>waiting for inventory</b></span>"
                 )
 
                 // Also disable the search bar so the user can't accidentally type something
@@ -712,12 +712,26 @@ jQuery(function () {
                 }
             }
 
+            console.log("\"enhancerAddCurrency\" is present, watiting for inventory...");
             setUpAutoAdd();
-            setTimeout(function () {
-                console.log("\"enhancerAddCurrency\" is present, running.");
-                inProgressAutoAdd();
-                processNextMatch(0);
-            }, 1200);
+
+            // Set up a MutationObserver callback to run when the inventory is loaded
+            const inventoriesElement = document.getElementById("trade_inventory_unavailable");
+            const inventoryAvailableObserver = new MutationObserver(function() {
+                setTimeout(function () {
+                    console.log("\"enhancerAddCurrency\" is present, running");
+                    inProgressAutoAdd();
+                    processNextMatch(0);
+                }, 100);
+            });
+            inventoryAvailableObserver.observe(
+              inventoriesElement,
+              {
+                      attributes: true,
+                      attributeFilter: ["style"]
+                  }
+              )
+
         }
     }
 

@@ -90,7 +90,9 @@ let tradeOfferPage = {
         let htmlString = `Summary (${items._total} ${items._total === 1 ? "item" : "items"}):<br>`;
 
         for (let prop in items) {
-            if (prop === "_total") continue;
+            if (prop === "_total") {
+                continue
+            }
 
             let item_type = items[prop];
             for (let quality in item_type) {
@@ -283,7 +285,7 @@ let tradeOfferWindow = {
         let isReady = jQuery("img[src$='throbber.gif']:visible").length <= 0;
 
         // our partner's inventory is also loading at this point
-        let itemParamExists = getUrlParameter("for_item") !== undefined;
+        let itemParamExists = getUrlParameter("for_item") !== null;
         let hasBeenLoaded = true;
 
         if (itemParamExists) {
@@ -545,7 +547,7 @@ jQuery(function () {
         tradeOfferWindow.init();
 
         let itemParam = getUrlParameter("for_item");
-        if (itemParam !== undefined) {
+        if (itemParam !== null) {
             let item = itemParam.split("_");
 
             unsafeWindow.g_rgCurrentTradeStatus.them.assets.push({
@@ -590,8 +592,7 @@ jQuery(function () {
         // TODO allow for e.g. "4.33ref"
 
         const enhancerAddCurrencyParam = getUrlParameter("enhancerAddCurrency");
-
-        if (enhancerAddCurrencyParam !== undefined) {
+        if (enhancerAddCurrencyParam !== null) {
             console.log("enhancerAddCurrency is present, waiting...");
             const paramArray = enhancerAddCurrencyParam.split(",");
             const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;

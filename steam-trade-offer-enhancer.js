@@ -400,6 +400,29 @@ jQuery(function () {
                 vertical-align: middle;
                 cursor: pointer;
             }
+            
+            #headingAddMultipleItems {
+                margin-bottom: 4px;
+                margin-left: 2px;
+            }
+            
+            .item_adder #btn_additems {
+                margin-left: 5px;
+                margin-bottom: 2px;
+                font-weight: bold;
+            }
+            
+            .item_adder #btn_additems.warning {
+                background-color: #a44631;
+                font-style: italic;
+            }
+            
+            #itemcount-warning {
+                font-size: 0.9rem;
+                margin-top: 4px;
+                margin-left: 1px;
+                min-height: 20px;
+            }
         </style>`;
     jQuery(style).appendTo("head");
 
@@ -450,7 +473,7 @@ jQuery(function () {
         jQuery("div.trade_left div.trade_box_contents").append(`
             <div class="trade_rule selectableNone"></div>
             <div class="item_adder">
-                <div class="selectableNone">Add multiple items:</div>
+                <div id="headingAddMultipleItems" class="selectableNone">Add multiple items:</div>
                 <input id="amount_control" class="filter_search_box" type="text" placeholder="16">
                 <button id="btn_additems" type="button" class="btn_custom">Add</button>
                 <div id="itemcount-warning" style="font-size: 0.9rem"></div>
@@ -499,7 +522,6 @@ jQuery(function () {
 
         // Handle item auto adder
         const btnAddItemsElement = jQuery("button#btn_additems");
-        btnAddItemsElement.after("<div id='itemcount-warning' style='font-size: 0.9rem'></div>")
 
         btnAddItemsElement.click(function () {
             // Do not add items if the offer cannot be modified
@@ -525,18 +547,25 @@ jQuery(function () {
 
         const amountControlElement = jQuery("input#amount_control");
 
-        amountControlElement.keyup(function () {
+        function checkUserHasEnoughItems () {
             const items = collectSearchedItems();
             const amountWanted = getAddInputAmount() || 0;
-            console.log(items.length, amountWanted);
+
+            const btnAddItemsElement = jQuery(".item_adder #btn_additems");
+            const ItemCountWarningElement = jQuery("#itemcount-warning");
 
             if (amountWanted > items.length) {
-                // TODO turn the button red
-                jQuery("#itemcount-warning").text("Warning: you do not have enough items!");
+                btnAddItemsElement.addClass("warning");
+                btnAddItemsElement.prop("disabled", true);
+                ItemCountWarningElement.html(`<b>Warning:</b> you only have <b>${items.length}</b> items of this type!`);
             } else {
-                jQuery("#itemcount-warning").text("");
+                btnAddItemsElement.removeClass("warning");
+                btnAddItemsElement.prop("disabled", false);
+                ItemCountWarningElement.text("");
             }
-        });
+        }
+        amountControlElement.keyup(checkUserHasEnoughItems);
+        amountControlElement.change(checkUserHasEnoughItems);
 
         jQuery("button#btn_clearmyitems").click(function () {
             tradeOfferWindow.clear("div#your_slots");

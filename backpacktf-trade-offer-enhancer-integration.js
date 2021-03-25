@@ -9,6 +9,10 @@
 // @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
 // ==/UserScript==
 
+/**
+ * Convert a (possibly decimal) value of refined into refined, reclaimed and scrap.
+ * Example: 1.66 would return [1, 2, 0] (1 ref, 2 scrap)
+ */
 function refDecimalToRefRecScrap (value) {
     const flooredRef = Math.floor(value);
     let remaining = value - flooredRef;
@@ -18,11 +22,12 @@ function refDecimalToRefRecScrap (value) {
     let scrap = 0;
 
     // Process the decimal places
-    while (remaining >= 0.11) {
-        if (remaining >= 0.33) {
+    // + 0.01 corrections to fix the floating point errors
+    while ((remaining + 0.01) >= 0.11) {
+        if ((remaining + 0.01) >= 0.33) {
             remaining -= 0.33;
             rec += 1;
-        } else if (remaining >= 0.11) {
+        } else if ((remaining + 0.01) >= 0.11) {
             remaining -= 0.11;
             scrap += 1;
         }
@@ -32,7 +37,22 @@ function refDecimalToRefRecScrap (value) {
 }
 
 jQuery(function () {
-    // Gather all classifields
+    // Append CSS
+    const globalCss = `<style type="text/css">
+    .bptf-enhancer-currency-status {
+        opacity: 0.4;
+        font-size: 11px;
+        margin-right: 2px;
+    }
+    .listing-buttons a.bptf-enhancer-done {
+        background-color: rgb(44,150,108);
+        border-color: rgb(32,158,108);
+        box-shadow: rgb(17,112,74) 1px -1px 10px -4px;
+    }
+    </style>`
+    jQuery(globalCss).appendTo("head");
+
+    // Gather all classifields on the page
     const classifields = jQuery(".listing");
     const descriptionCurrencyRegex = /(\d+(?:\.\d+)?)\s?(keys?|ref)/ig;
 
@@ -41,7 +61,7 @@ jQuery(function () {
         const JQElement = jQuery(element);
 
         let currencyString = JQElement.find(".tag.bottom-right span").text();
-        let description = JQElement.find(".quote-box p").text();
+        let descriptionString = JQElement.find(".quote-box p").text();
 
         let currencyInfo = currencyString.split(" ");
         if (currencyInfo.length !== 2) {
@@ -52,6 +72,13 @@ jQuery(function () {
         const currencyAmount = parseFloat(currencyInfo[0]);
         const currencyType = currencyInfo[1];
 
+        // Add a status indicator
+        JQElement.find(".listing-buttons")
+          .prepend("<span class='bptf-enhancer-currency-status'></span>");
+        const statusElement = JQElement.find(".bptf-enhancer-currency-status");
+
+        statusElement.text("loading");
+
         let totalCurrencyMap = {
             "key": 0,
             "ref": 0,
@@ -60,6 +87,9 @@ jQuery(function () {
         }
 
         if (currencyType === "key" || currencyType === "keys") {
+            /*
+             CURRENCY: keys
+             */
             const flooredKeys = Math.floor(currencyAmount);
             const remaining = currencyAmount - flooredKeys;
 
@@ -70,12 +100,12 @@ jQuery(function () {
                 // Process the decimal places
 
                 // Try processing the description first
-                const matchesArray = [...description.matchAll(descriptionCurrencyRegex)];
+                const matchesArray = [...descriptionString.matchAll(descriptionCurrencyRegex)];
                 if (matchesArray.length >= 1) {
                     for (let i = 0; i < matchesArray.length; i++) {
                         const match = matchesArray[i];
                         if (match.length !== 3) {
-                            console.warn("Expected legnth 3, got " + match.length + ": " + match + " on \"" + description + "\".");
+                            console.warn("Expected legnth 3, got " + match.length + ": " + match + " on \"" + descriptionString + "\".");
                             continue;
                         }
 
@@ -99,32 +129,45 @@ jQuery(function () {
                 }
             }
         } else if (currencyType === "ref") {
+            /*
+             CURRENCY: ref
+             */
             const unpackedCurrency = refDecimalToRefRecScrap(currencyAmount);
             totalCurrencyMap.ref = unpackedCurrency[0];
             totalCurrencyMap.rec = unpackedCurrency[1];
             totalCurrencyMap.scrap = unpackedCurrency[2];
         }
 
+        // Take the calculated value and display it and the UI as well as update the trade link
         let encodedCurrencyArray = [];
-        for (let element of Object.entries(totalCurrencyMap)) {
-            let name = element[0];
-            let amount = element[1];
-
+        for (let [name, amount] of Object.entries(totalCurrencyMap)) {
             if (amount > 0) {
-                encodedCurrencyArray.push(amount.toString() + name);
+                encodedCurrencyArray.push(`${amount}${name}`);
             }
         }
 
         let encodedCurrency = encodedCurrencyArray.join(",");
 
-        console.log(totalCurrencyMap);
-        console.log("[" + encodedCurrency + "] " + description);
+        // Update the status, add class to trade button and log
+        let encodedCurrencyArrayHuman = [];
+        for (let [name, amount] of Object.entries(totalCurrencyMap)) {
+            if (amount > 0) {
+                encodedCurrencyArrayHuman.push(`${amount} ${name}`);
+            }
+        }
+        statusElement.text(`(${encodedCurrencyArrayHuman.join(", ")})`)
 
+        // Update the link to automatically load the required currency when opened
         const tradeButton = JQElement.find(
           ".listing-buttons a[href^='https://steamcommunity.com/tradeoffer/']"
         );
         const previousHref = tradeButton.attr("href");
-        // Update the link to automatically load the required currency when opened
         tradeButton.attr("href", previousHref + "&enhancerAddCurrency=" + encodedCurrency)
+
+        // Make the trade button look slightly glowy
+        tradeButton.addClass("bptf-enhancer-done");
+
+        console.log(totalCurrencyMap);
+        console.log("[" + encodedCurrency + "] " + descriptionString);
     });
 })()

@@ -640,8 +640,8 @@ jQuery(function () {
         }
 
 
-        // Added url parameter to automatically add some currency on your side
-        // The parameter is named "enhancerAddCurrency" and the format is:
+        // Added url parameter to automatically add some currency on your or the other trader's side
+        // The parameters are "enhancerAddCurrencySelf" and "enhancerAddCurrencyOther", the format is:
         //     comma-separated currencies, e.g. "...&enhancerAddCurrency=1key,3.44ref&..."
         //     Supported currencies: "key", "ref", "rec", "scrap"
         //
@@ -657,9 +657,12 @@ jQuery(function () {
         };
         // TODO allow for e.g. "4.33ref" (though this is handled by the bptf integration anyway)
 
-        const enhancerAddCurrencyParam = getUrlParameter("enhancerAddCurrency");
-        if (enhancerAddCurrencyParam !== null) {
-            const paramArray = enhancerAddCurrencyParam.split(",");
+        const enhancerAddCurrencySelfParam = getUrlParameter("enhancerAddCurrencySelf");
+        const enhancerAddCurrencyOtherParam = getUrlParameter("enhancerAddCurrencyOther");
+
+        // If any of the above url parameters are present, prepare to load the currencies
+        if (enhancerAddCurrencySelfParam || enhancerAddCurrencyOtherParam) {
+
             const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
 
             let missingCurrencyAmount = {
@@ -670,7 +673,7 @@ jQuery(function () {
             };
             let erroredDuringLoad = false;
 
-            function setUpAutoAdd() {
+            function autoAddSetUp() {
                 let filterContainer = jQuery(".filter_ctn");
                 filterContainer.append(
                     `<span class='autoadd-status-container'>
@@ -683,7 +686,7 @@ jQuery(function () {
                 jQuery(".filter_control_ctn input").prop("disabled", true);
             }
 
-            function inProgressAutoAdd() {
+            function autoAddInProgress() {
                 // Update the status
                 jQuery(".autoadd-status-container .status")
                   .removeClass("waiting done error")
@@ -691,7 +694,7 @@ jQuery(function () {
                   .text("in-progress")
             }
 
-            function errorAutoAdd() {
+            function autoAddError() {
                 const missingCurrencyArray = [];
                 for (let [key, value] of Object.entries(missingCurrencyAmount)) {
                     if (value > 0) {
@@ -705,7 +708,7 @@ jQuery(function () {
                   .text(`not enough items (missing ${missingCurrencyArray.join(", ")})!`);
             }
 
-            function finishAutoAdd() {
+            function autoAddFinish() {
                 // Clear the search bar
                 setItemSearchAndUpdate("");
                 // Update the status
@@ -719,19 +722,22 @@ jQuery(function () {
                 jQuery(".filter_control_ctn").addClass("finishedAnimation");
             }
 
-            function processNextMatch(index) {
-                if (index >= paramArray.length) {
+            function processNextMatch(array, index, finishedCallback) {
+                if (index >= array.length) {
                     if (!erroredDuringLoad) {
-                        finishAutoAdd();
+                        autoAddFinish();
+                    }
+                    if (finishedCallback) {
+                        finishedCallback();
                     }
                     return;
                 }
 
                 try {
-                    let matched = paramArray[index].match(currencyRegex);
+                    let matched = array[index].match(currencyRegex);
                     if (matched === null || matched.length !== 3) {
-                        console.warn("Format was not recognized: " + paramArray[index]);
-                        return processNextMatch(index + 1);
+                        console.warn("Format was not recognized: " + array[index]);
+                        return processNextMatch(array, index + 1, finishedCallback);
                     }
 
                     let currencyAmount = parseInt(matched[1]);
@@ -739,8 +745,8 @@ jQuery(function () {
 
                     let searchTerm = currencyTypeToSearchTermMap[currencyType];
                     if (searchTerm === undefined) {
-                        console.warn("Format was not recognized: " + paramArray[i]);
-                        return processNextMatch(index + 1);
+                        console.warn("Format was not recognized: " + array[index]);
+                        return processNextMatch(array, index + 1, finishedCallback);
                     }
 
                     setItemSearchAndUpdate(searchTerm);
@@ -753,7 +759,7 @@ jQuery(function () {
                             missingCurrencyAmount[currencyType] += missingAmount;
 
                             erroredDuringLoad = true;
-                            errorAutoAdd();
+                            autoAddError();
                         }
 
                         // Move items
@@ -763,34 +769,73 @@ jQuery(function () {
 
                         setTimeout(function () {
                             tradeOfferWindow.summarise();
-                            return processNextMatch(index + 1);
+                            return processNextMatch(array, index + 1, finishedCallback);
                         }, currencyAmount * 50 + 500);
                     }, 1000);
                 } catch (e) {
                     console.error("Something went wrong while automatically adding currency: " + e);
-                    return processNextMatch(index + 1);
+                    return processNextMatch(array, index + 1, finishedCallback);
                 }
             }
 
-            console.log("\"enhancerAddCurrency\" is present, watiting for inventory...");
-            setUpAutoAdd();
+            autoAddSetUp();
+            console.log("\"enhancerAddCurrencySelf/Other\" is present, watiting for inventory...");
+
+            let tasks = [];
+            if (enhancerAddCurrencyOtherParam) {
+                tasks.push([
+                    enhancerAddCurrencyOtherParam.split(","),
+                    function() {
+                        jQuery("#inventory_select_their_inventory").click()
+                    },
+                ]);
+            }
+            if (enhancerAddCurrencySelfParam) {
+                tasks.push([
+                    enhancerAddCurrencySelfParam.split(","),
+                  function() {
+                      jQuery("#inventory_select_your_inventory").click()
+                  },
+                ]);
+            }
 
             // Set up a MutationObserver callback to run when the inventory is loaded
+
             const inventoriesElement = document.getElementById("trade_inventory_unavailable");
-            const inventoryAvailableObserver = new MutationObserver(function() {
+            const inventoriesAvailableObserver = new MutationObserver(function() {
+                inventoriesAvailableObserver.disconnect();
                 setTimeout(function () {
-                    console.log("\"enhancerAddCurrency\" is present, running");
-                    inProgressAutoAdd();
-                    processNextMatch(0);
+                    console.log("\"enhancerAddCurrency\" is present, inventories ready, running");
+
+                    // TODO Might want to look into doing this with promises, this is absolutely unreadable
+                    // For any poor soul reading this: this just pops two elements from the tasks array
+                    // and runs processNextMatch on them.
+                    autoAddInProgress();
+                    const nextTask = tasks.pop();
+                    if (nextTask) {
+                        const [taskArray, func] = nextTask;
+                        func();
+
+                        processNextMatch(taskArray, 0, function () {
+                            const nextTask = tasks.pop();
+                            if (nextTask) {
+                                const [taskArray, func] = nextTask;
+                                func();
+
+                                processNextMatch(taskArray, 0);
+                            }
+                        });
+                    }
                 }, 100);
             });
-            inventoryAvailableObserver.observe(
-              inventoriesElement,
-              {
-                      attributes: true,
-                      attributeFilter: ["style"]
-                  }
-              )
+
+            inventoriesAvailableObserver.observe(
+                inventoriesElement,
+                {
+                        attributes: true,
+                        attributeFilter: ["style"]
+                    }
+            )
 
         }
     }

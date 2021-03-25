@@ -438,11 +438,28 @@ jQuery(function () {
                 animation-duration: .35s;
             }
             
-            .autoadd-status {
+            .autoadd-status-container {
                 font-size: 0.9rem;
                 margin-left: 1px;
                 position: relative;
                 top: 6px;
+            }
+            
+            .autoadd-status-container .status {
+                font-size: 0.85rem;
+                font-weight: bold;
+            }
+            .autoadd-status-container .status.waiting {
+                color: rgb(135,159,203);
+            }
+            .autoadd-status-container .status.in-progress {
+                color: rgb(210,170,255);
+            }
+            .autoadd-status-container .status.error {
+                color: rgb(255,177,170);
+            }
+            .autoadd-status-container .status.done {
+                color: rgb(51,191,41);
             }
         </style>`;
     jQuery(style).appendTo("head");
@@ -623,9 +640,7 @@ jQuery(function () {
         }
 
 
-
-        /// Patch 1
-        // Add url parameter to automatically add some currency on your side
+        // Added url parameter to automatically add some currency on your side
         // The parameter is named "enhancerAddCurrency" and the format is:
         //     comma-separated currencies, e.g. "...&enhancerAddCurrency=1key,3.44ref&..."
         //     Supported currencies: "key", "ref", "rec", "scrap"
@@ -636,7 +651,6 @@ jQuery(function () {
         const currencyTypeToSearchTermMap = {
             // Search terms to filter to just the keys
             "key": "Mann Co. Supply Crate Key Tool",
-            "keys": "Mann Co. Supply Crate Key Tool",
             "ref": "Refined Metal Craft Item",
             "rec": "Reclaimed Metal Craft Item",
             "scrap": "Scrap Metal Craft Item",
@@ -648,10 +662,21 @@ jQuery(function () {
             const paramArray = enhancerAddCurrencyParam.split(",");
             const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
 
+            let missingCurrencyAmount = {
+                key: 0,
+                ref: 0,
+                rec: 0,
+                scrap: 0,
+            };
+            let erroredDuringLoad = false;
+
             function setUpAutoAdd() {
                 let filterContainer = jQuery(".filter_ctn");
                 filterContainer.append(
-                  "<span class='autoadd-status'>Auto-adding currency: <b style='color: rgb(135,159,203)'>waiting for inventory</b></span>"
+                    `<span class='autoadd-status-container'>
+                        <span>Auto-adding currency:</span>
+                        <span class="status waiting">waiting for inventory</span>
+                    </span>`
                 )
 
                 // Also disable the search bar so the user can't accidentally type something
@@ -660,14 +685,34 @@ jQuery(function () {
 
             function inProgressAutoAdd() {
                 // Update the status
-                jQuery(".autoadd-status").html("Auto-add currency: <b style='color: rgb(210,170,255)'>in-progress</b>")
+                jQuery(".autoadd-status-container .status")
+                  .removeClass("waiting done error")
+                  .addClass("in-progress")
+                  .text("in-progress")
+            }
+
+            function errorAutoAdd() {
+                const missingCurrencyArray = [];
+                for (let [key, value] of Object.entries(missingCurrencyAmount)) {
+                    if (value > 0) {
+                        missingCurrencyArray.push(`${value} ${key}`);
+                    }
+                }
+
+                jQuery(".autoadd-status-container .status")
+                  .removeClass("waiting in-progress done")
+                  .addClass("error")
+                  .text(`not enough items (missing ${missingCurrencyArray.join(", ")})!`);
             }
 
             function finishAutoAdd() {
                 // Clear the search bar
                 setItemSearchAndUpdate("");
                 // Update the status
-                jQuery(".autoadd-status").html("Auto-add currency: <b style='color: rgb(51,191,41)'>done</b>")
+                jQuery(".autoadd-status-container .status")
+                  .removeClass("in-progress")
+                  .addClass("done")
+                  .text("done")
                 // Renable the search bar
                 jQuery(".filter_control_ctn input").prop("disabled", false);
                 // Show the bump animation
@@ -676,7 +721,9 @@ jQuery(function () {
 
             function processNextMatch(index) {
                 if (index >= paramArray.length) {
-                    finishAutoAdd();
+                    if (!erroredDuringLoad) {
+                        finishAutoAdd();
+                    }
                     return;
                 }
 
@@ -698,11 +745,24 @@ jQuery(function () {
 
                     setItemSearchAndUpdate(searchTerm);
                     setTimeout(function () {
-                        // Set amount of such items and trigger the click
-                        jQuery("input#amount_control").val(currencyAmount);
-                        jQuery("button#btn_additems").trigger("click");
+                        const inventoryLoadedItems = collectSearchedItems();
+
+                        // Warn the user if not enough users
+                        if (currencyAmount > inventoryLoadedItems.length) {
+                            let missingAmount = currencyAmount - inventoryLoadedItems.length;
+                            missingCurrencyAmount[currencyType] += missingAmount;
+
+                            erroredDuringLoad = true;
+                            errorAutoAdd();
+                        }
+
+                        // Move items
+                        for (let i = 0; i < currencyAmount; i++) {
+                            setTimeout(MoveItemToTrade, i * 50, inventoryLoadedItems[i]);
+                        }
 
                         setTimeout(function () {
+                            tradeOfferWindow.summarise();
                             return processNextMatch(index + 1);
                         }, currencyAmount * 50 + 500);
                     }, 1000);

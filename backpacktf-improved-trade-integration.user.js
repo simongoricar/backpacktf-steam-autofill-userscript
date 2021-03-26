@@ -4,7 +4,7 @@
 // @description An integration with Improved HusKy's Steam Trade Offer Enhancer. Automatically adds the required amount of currency on your side.
 // @include     https://backpack.tf/classifieds*
 // @include     https://backpack.tf/stats/*
-// @version     1.0.1
+// @version     1.0.2
 // @author      DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
@@ -12,6 +12,9 @@
 // ==/UserScript==
 
 /// CHANGELOG
+// 1.0.2
+//  - Support for 1.5.2 of the Improved Steam Trade Offer Enhancer userscript (what a name).
+//
 // 1.0.1
 //  - Improve currency detection
 //  - Improve UI elements
@@ -183,7 +186,7 @@ jQuery(function () {
           ".listing-buttons a[href^='https://steamcommunity.com/tradeoffer/']"
         );
         const previousHref = tradeButton.attr("href");
-        const paramEnhancerAddType = orderType === "self" ? "Self" : "Other";
+        const paramEnhancerAddType = orderType === "self" ? "Self" : "Partner";
 
         tradeButton.attr("href", `${previousHref}&enhancerAddCurrency${paramEnhancerAddType}=${encodedCurrency}`)
 
@@ -202,6 +205,6 @@ jQuery(function () {
 
     buyOrders.each(function (index, element) {
         const JQElement = jQuery(element);
-        processClassifield(JQElement, "other");
+        processClassifield(JQElement, "partner");
     });
 });

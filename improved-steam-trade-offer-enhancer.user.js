@@ -4,7 +4,7 @@
 // @description Userscript to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.5.2
+// @version     1.5.3dev
 // @author      HusKy, improvements by DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
@@ -12,6 +12,10 @@
 // ==/UserScript==
 
 /// CHANGELOG
+// 1.5.3
+//  - Add "Add keys/ref/rec/scrap" buttons for quickly adding pure currencies
+//
+//
 // 1.5.2
 //  - Huge improvement to the auto-add speed! (doesn't manually search anymore)
 //  - Renamed auto-add parameters: now "enhancerAddCurrencySelf" and "enhancerAddCurrencyPartner".
@@ -217,13 +221,13 @@ const style =
         font-size: 13px;
     }
 
-    .item_adder #btn_additems {
+    #btn_additems {
         margin-left: 5px;
         margin-bottom: 2px;
         font-weight: bold;
     }
 
-    .item_adder #btn_additems.warning {
+    .enhanced-trade-offer_btn.warning {
         background-color: #a44631;
         font-style: italic;
     }
@@ -316,6 +320,7 @@ const tradeBoxAfterHTML =
         <br>
 
         <div class="enhanced-trade-offer_btn-container">
+            <button id="btn_additems-keys" type="button" class="enhanced-trade-offer_btn">Add keys</button>
             <button id="btn_additems-ref" type="button" class="enhanced-trade-offer_btn">Add ref</button>
             <button id="btn_additems-rec" type="button" class="enhanced-trade-offer_btn">Add reclaimed</button>
             <button id="btn_additems-scrap" type="button" class="enhanced-trade-offer_btn">Add scrap</button>
@@ -337,38 +342,54 @@ const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
  * USEFUL FUNCTIONS
  */
 
-/**
- * Returns an Object containing items currently filtered (not just shown) in the trade window.
- */
-function collectSearchedItems () {
-    let inventory = jQuery("div.inventory_ctn:visible");
-
-    return inventory
-        .find("div.itemHolder")
-        .filter(function () {
-            return jQuery(this).css("display") !== "none";
-            }
-        )
-        .find("div.item")
-        .filter(function () {
-            return jQuery(this).css("display") !== "none";
-            }
-        );
+function getActiveInventoryItems() {
+    return jQuery(".inventory_ctn:visible")
+        .find(".itemHolder .item");
 }
 
-/**
- * Given a predicate (true/false) function, filter the items from `collectSearchedItems`.
- */
-function filterSearchedItems (predicate) {
-    const searchedItems = collectSearchedItems();
-    return searchedItems.filter(predicate);
+function collectFilteredInventoryItems(inventoryItems) {
+    if (typeof inventoryItems === "undefined" || inventoryItems === null) {
+        inventoryItems = getActiveInventoryItems();
+    }
+
+    return inventoryItems.filter(function (index, element) {
+        return jQuery(element).css("display") !== "none";
+    });
+}
+
+function collectInventoryItemsWithDefindex(inventoryItems, defindex) {
+    if (typeof inventoryItems === "undefined" || inventoryItems === null) {
+        inventoryItems = getActiveInventoryItems();
+    }
+
+    return inventoryItems.filter(function (index, element) {
+        const elementRgItem = element.rgItem;
+        const elementDefIndex = parseInt((elementRgItem.app_data || {}).def_index);
+
+        if (typeof elementDefIndex === "undefined") {
+            logger.warn(`Error while filtering, something is wrong with rgItem: ${elementRgItem}`)
+            console.log(element);
+            return false;
+        }
+
+        return elementDefIndex === defindex;
+    });
 }
 
 /**
  * Returns the amount of items the user requested to add.
  */
-function getAddItemButtonAmount () {
-    return parseInt(jQuery("input#amount_control").val());
+function getAddItemButtonAmount(defaultAmount) {
+    if (typeof defaultAmount === "undefined") {
+        defaultAmount = 16;
+    }
+
+    const inputAmount = parseInt(jQuery("input#amount_control").val());
+    if (isNaN(inputAmount)) {
+        return defaultAmount;
+    } else {
+        return inputAmount;
+    }
 }
 
 /**
@@ -796,26 +817,17 @@ jQuery(function () {
 
         // Handle item auto adder
         const btnAddItemsElement = jQuery("button#btn_additems");
+        const btnAddKeysElement = jQuery("button#btn_additems-keys");
+        const btnAddRefElement = jQuery("button#btn_additems-ref");
+        const btnAddRecElement = jQuery("button#btn_additems-rec");
+        const btnAddScrapElement = jQuery("button#btn_additems-scrap");
         const amountControlElement = jQuery("input#amount_control");
 
-        btnAddItemsElement.click(function () {
-            // Do not add items if the offer cannot be modified
-            if (jQuery("div.modify_trade_offer:visible").length > 0) return;
-
-            const inventoryItems = collectSearchedItems();
-            let amount = getAddItemButtonAmount();
-
-            if (isNaN(amount)) {
-                amount = 16;
-            }
-            if (inventoryItems.length < amount) {
-                amount = inventoryItems.length;
-            }
-
+        function addItemsToTrade(itemArray, amount) {
             // Add the correct amount of items
             for (let i = 0; i < amount; i++) {
                 // i * 50 queues the function calls 50ms apart
-                setTimeout(MoveItemToTrade, i * 50, inventoryItems[i]);
+                setTimeout(MoveItemToTrade, i * 50, itemArray[i]);
             }
 
             // This is reached before the MoveItemToTrade functions have even been called
@@ -824,30 +836,109 @@ jQuery(function () {
                 // Refresh summaries
                 tradeOfferWindow.summarise();
             }, amount * 50 + 500);
+        }
+
+        btnAddItemsElement.click(function () {
+            // Do not add items if the offer cannot be modified
+            if (jQuery("div.modify_trade_offer:visible").length > 0) return;
+
+            const inventoryItems = collectFilteredInventoryItems();
+            let amount = getAddItemButtonAmount(16);
+            if (inventoryItems.length < amount) {
+                amount = inventoryItems.length;
+            }
+
+            addItemsToTrade(inventoryItems, amount);
         });
+
+        btnAddKeysElement.click(function () {
+            const inventoryItems = collectInventoryItemsWithDefindex(null, currencyDefindexes.key);
+            let amount = getAddItemButtonAmount(16);
+
+            logger.info(`Adding ${amount} keys to trade.`);
+            addItemsToTrade(inventoryItems, amount);
+        });
+
+        btnAddRefElement.click(function () {
+            const inventoryItems = collectInventoryItemsWithDefindex(null, currencyDefindexes.ref);
+            let amount = getAddItemButtonAmount(16);
+
+            logger.info(`Adding ${amount} refined to trade.`);
+            addItemsToTrade(inventoryItems, amount);
+        });
+
+        btnAddRecElement.click(function () {
+            const inventoryItems = collectInventoryItemsWithDefindex(null, currencyDefindexes.rec);
+            let amount = getAddItemButtonAmount(16);
+
+            logger.info(`Adding ${amount} reclaimed to trade.`);
+            addItemsToTrade(inventoryItems, amount);
+        });
+
+        btnAddScrapElement.click(function () {
+            const inventoryItems = collectInventoryItemsWithDefindex(null, currencyDefindexes.scrap);
+            let amount = getAddItemButtonAmount(16);
+
+            logger.info(`Adding ${amount} scrap to trade.`);
+            addItemsToTrade(inventoryItems, amount);
+        });
+
+        function enableAddButton(buttonElement) {
+            buttonElement.removeClass("warning");
+            buttonElement.prop("disabled", false);
+        }
+
+        function disableAddButton(buttonElement) {
+            buttonElement.addClass("warning");
+            buttonElement.prop("disabled", true);
+        }
 
         /**
          * Will check if the user has enough items.
          * Will not return anything, but will update the UI accordingly.
          */
         function verifyUserHasEnoughItems () {
+            const selectedInventoryArray = getActiveInventoryItems();
+
             // 1) Verify enough items as searched
-            const items = collectSearchedItems();
-            const amountWanted = getAddItemButtonAmount() || 0;
+            const filteredItemsAmount = collectFilteredInventoryItems(selectedInventoryArray).length;
+            const amountWanted = getAddItemButtonAmount(0);
 
             const btnAddItemsElement = jQuery(".item_adder #btn_additems");
             const ItemCountWarningElement = jQuery("#itemcount-warning");
 
-            if (amountWanted > items.length) {
-                btnAddItemsElement.addClass("warning");
-                btnAddItemsElement.prop("disabled", true);
+            if (amountWanted > filteredItemsAmount) {
+                disableAddButton(btnAddItemsElement);
                 ItemCountWarningElement.html(
-                    `<b>Warning:</b> you only have <b>${items.length}</b> items of this type!`
+                    `<b>Warning:</b> you only have <b>${filteredItemsAmount}</b> items of this type!`
                 );
             } else {
-                btnAddItemsElement.removeClass("warning");
-                btnAddItemsElement.prop("disabled", false);
+                enableAddButton(btnAddItemsElement);
                 ItemCountWarningElement.text("");
+            }
+
+            // 2) Verify enough key/ref/rec/scrap in inventory for the corresponding buttons
+            const keysAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.key).length;
+            const refAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.ref).length;
+            const recAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.rec).length;
+            const scrapAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.scrap).length;
+
+            enableAddButton(btnAddKeysElement);
+            enableAddButton(btnAddRefElement);
+            enableAddButton(btnAddRecElement);
+            enableAddButton(btnAddScrapElement);
+
+            if (amountWanted > keysAmount) {
+                disableAddButton(btnAddKeysElement);
+            }
+            if (amountWanted > refAmount) {
+                disableAddButton(btnAddRefElement);
+            }
+            if (amountWanted > recAmount) {
+                disableAddButton(btnAddRecElement);
+            }
+            if (amountWanted > scrapAmount) {
+                disableAddButton(btnAddScrapElement);
             }
         }
 
@@ -1041,18 +1132,7 @@ jQuery(function () {
 
                     // Filter the inventory to JUST the currency we need
                     // (there is no actual search, it just filters the array)
-                    const matchingLoadedItems = filterSearchedItems(function (key, item) {
-                        const rgItem = item.rgItem;
-                        const defIndex = parseInt((rgItem.app_data || {}).def_index);
-
-                        if (typeof defIndex === "undefined") {
-                            logger.warn(`Error while filtering, something is wrong with rgItem: ${rgItem}`)
-                            console.log(item);
-                            return false;
-                        }
-
-                        return defIndex === currencyDefindex;
-                    });
+                    const matchingLoadedItems = collectInventoryItemsWithDefindex(null, currencyDefindex);
 
                     // Warn the user if they do not have enough items
                     if (currencyAmount > matchingLoadedItems.length) {

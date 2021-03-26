@@ -4,7 +4,7 @@
 // @description Userscript to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.5
+// @version     1.5.1
 // @author      HusKy, improvements by DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
@@ -12,6 +12,11 @@
 // ==/UserScript==
 
 /// CHANGELOG
+// 1.5.1
+//  - Fix auto-add status not showing properly
+//  - Add @updateURL for Tampermonkey
+//  - Improve speed when using auto-add (now adds immediately as the inventory is loaded)
+//
 // 1.5
 //  - Clean up the code a bit
 //  - Added a warning if the user doesn't have enough items (during auto-fill or manually)
@@ -23,6 +28,80 @@
 //  - added "enhancerAddCurrency" url parameter to allow automatically adding currency on your side
 //    Useful with the "backpack.tf Trade Offer Enhancer integration".
 ///
+
+const logStylesArray = [
+    "background-color: #D57F2A",
+    "color: #000",
+    "font-weight: bold",
+    "padding: 2px 3px",
+    "border-radius: 2px",
+];
+const informationalStylesArray = [
+    "color: #81BF40",
+];
+const warningStylesArray = [
+    "color: #E0981F",
+];
+const errorStylesArray = [
+    "color: #E71748",
+];
+const successStylesArray = [
+    "color: #37C865",
+];
+
+/**
+ * Simple Logger that prepends the instance name.
+ * Format: "[LoggerName] <your message>"
+ */
+class Logger {
+    constructor(name) {
+        this.name = name;
+    }
+
+    _prepare(message, type) {
+        // Returns an array of aruments for the logging function
+
+        // Stringify only if it is an object
+        const value = message instanceof Object ? JSON.stringify(message) : message;
+
+        const boxStyles = logStylesArray.join(";");
+
+        let textStyles = null;
+        if (type === "informational") {
+            textStyles = informationalStylesArray.join(";");
+        } else if (type === "warning") {
+            textStyles = warningStylesArray.join(";");
+        } else if (type === "error") {
+            textStyles = errorStylesArray.join(";");
+        } else if (type === "success") {
+            textStyles = successStylesArray.join(";");
+        }
+
+        return [`%c${this.name}%c ${value}`, boxStyles, textStyles];
+    }
+
+    info(message) {
+        console.info(...this._prepare(message, "informational"));
+    }
+
+    success(message) {
+        console.info(...this._prepare(message, "success"));
+    }
+
+    debug(message) {
+        console.debug(...this._prepare(message, "informational"));
+    }
+
+    warn(message) {
+        console.warn(...this._prepare(message, "warning"));
+    }
+
+    error(message) {
+        console.error(...this._prepare(message, "error"));
+    }
+}
+
+const logger = new Logger("STEAM TRADE ENHANCER");
 
 const params = new URLSearchParams(window.location.search);
 
@@ -98,8 +177,8 @@ let tradeOfferPage = {
             let item_type = items[prop];
             for (let quality in item_type) {
                 htmlString +=
-                  `<span 
-                    class="summary_item" 
+                  `<span
+                    class="summary_item"
                     style="background-image: url('${prop}'); border-color: ${quality}">
                         <span class="summary_badge">${item_type[quality]}</span>
                     </span>`;
@@ -237,8 +316,8 @@ let tradeOfferWindow = {
             let item_type = items[prop];
             for (let quality in item_type) {
                 htmlString += `
-                    <span 
-                    class="summary_item" 
+                    <span
+                    class="summary_item"
                     style="background-image: url('${prop}'); border-color: ${quality};">
                         <span class="summary_badge">
                             ${item_type[quality]}
@@ -354,11 +433,11 @@ jQuery(function () {
                 color: #fff;
                 font-size: 10px;
             }
-            
+
             .warning {
                 color: #ff4422;
             }
-            
+
             .info {
                 padding: 1px 3px;
                 border-radius: 4px;
@@ -366,7 +445,7 @@ jQuery(function () {
                 border: 1px solid #003399;
                 font-size: 14px;
             }
-            
+
             .summary_item {
                 padding: 3px;
                 margin: 0 2px 2px 0;
@@ -380,7 +459,7 @@ jQuery(function () {
                 height: 48px;
                 display: inline-block;
             }
-            
+
             .summary_badge {
                 padding: 1px 3px;
                 border-radius: 4px;
@@ -388,7 +467,7 @@ jQuery(function () {
                 border: 1px solid #003399;
                 font-size: 12px;
             }
-            
+
             .btn_custom {
                 border-width: 0;
                 background-color: black;
@@ -401,36 +480,36 @@ jQuery(function () {
                 vertical-align: middle;
                 cursor: pointer;
             }
-            
+
             #headingAddMultipleItems {
                 margin-bottom: 4px;
                 margin-left: 2px;
             }
-            
+
             .item_adder #btn_additems {
                 margin-left: 5px;
                 margin-bottom: 2px;
                 font-weight: bold;
             }
-            
+
             .item_adder #btn_additems.warning {
                 background-color: #a44631;
                 font-style: italic;
             }
-            
+
             #itemcount-warning {
                 font-size: 0.9rem;
                 margin-top: 4px;
                 margin-left: 1px;
                 min-height: 20px;
             }
-            
+
             @keyframes autoAddFinished {
                 0% { transform: scale(1) }
                 60% { transform: scale(1.1) }
                 100% { transform: scale(1) }
             }
-            
+
             .filter_control_ctn.finishedAnimation {
                 animation-name: autoAddFinished;
                 animation-fill-mode: forwards;
@@ -438,14 +517,14 @@ jQuery(function () {
                 animation-timing-function: cubic-bezier(0.75, 0.25, 0.44, 0.87);
                 animation-duration: .35s;
             }
-            
+
             .autoadd-status-container {
                 font-size: 0.9rem;
                 margin-left: 1px;
                 position: relative;
                 top: 6px;
             }
-            
+
             .autoadd-status-container .status {
                 font-size: 0.85rem;
                 font-weight: bold;
@@ -677,7 +756,25 @@ jQuery(function () {
             };
             let hadMissingCurrencyDuringLoad = false;
 
+            function constructMissingCurrencyString () {
+                const missingCurrencyArray = [];
+                for (let [key, value] of Object.entries(missingCurrencyAmount)) {
+                    if (value > 0) {
+                        missingCurrencyArray.push(`${value} ${key}`);
+                    }
+                }
+
+                return missingCurrencyArray.join(", ");
+            }
+
+            /*
+             UI ELEMENTS
+             */
+            let autoAddUIStatus = null;
+
             function autoAddSetUp() {
+                autoAddUIStatus = "waiting";
+
                 let filterContainer = jQuery(".filter_ctn");
                 filterContainer.append(
                     `<span class='autoadd-status-container'>
@@ -691,6 +788,12 @@ jQuery(function () {
             }
 
             function autoAddInProgress() {
+                // If already in-progress (or in-progress error), do not change.
+                if (autoAddUIStatus === "in-progress" || autoAddUIStatus === "error") {
+                    return;
+                }
+                autoAddUIStatus = "in-progress";
+
                 // Update the status
                 jQuery(".autoadd-status-container .status")
                   .removeClass("waiting done error")
@@ -698,18 +801,9 @@ jQuery(function () {
                   .text("in-progress")
             }
 
-            function constructMissingCurrencyString () {
-                const missingCurrencyArray = [];
-                for (let [key, value] of Object.entries(missingCurrencyAmount)) {
-                    if (value > 0) {
-                        missingCurrencyArray.push(`${value} ${key}`);
-                    }
-                }
-
-                return missingCurrencyArray.join(", ");
-            }
-
             function autoAddError() {
+                autoAddUIStatus = "error";
+
                 jQuery(".autoadd-status-container .status")
                   .removeClass("waiting in-progress done")
                   .addClass("error")
@@ -717,13 +811,17 @@ jQuery(function () {
             }
 
             function autoAddFinish() {
+                logger.success("Auto-adder DONE.");
                 // Update the status
+
                 if (hadMissingCurrencyDuringLoad) {
+                    autoAddUIStatus = "done-error";
                     jQuery(".autoadd-status-container .status")
                       .removeClass("in-progress error")
                       .addClass("done-error")
                       .text(`done (missing ${constructMissingCurrencyString()})!`)
                 } else {
+                    autoAddUIStatus = "done";
                     jQuery(".autoadd-status-container .status")
                       .removeClass("in-progress")
                       .addClass("done")
@@ -754,7 +852,7 @@ jQuery(function () {
                 try {
                     let matched = array[index].match(currencyRegex);
                     if (matched === null || matched.length !== 3) {
-                        console.warn("Format was not recognized: " + array[index]);
+                        logger.warn("Format was not recognized: " + array[index]);
                         return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
@@ -763,7 +861,7 @@ jQuery(function () {
 
                     let searchTerm = currencyTypeToSearchTermMap[currencyType];
                     if (searchTerm === undefined) {
-                        console.warn("Format was not recognized: " + array[index]);
+                        logger.warn("Format was not recognized: " + array[index]);
                         return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
@@ -792,79 +890,108 @@ jQuery(function () {
                         }, currencyAmount * 50 + 500);
                     }, 1000);
                 } catch (e) {
-                    console.error("Something went wrong while automatically adding currency: " + e);
+                    logger.error("Something went wrong while automatically adding currency: " + e);
                     return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                 }
             }
 
             autoAddSetUp();
-            console.log("\"enhancerAddCurrencySelf/Other\" is present, watiting for inventory...");
+            logger.info("enhancerAddCurrency(Self/Other) is present, watiting for inventory...");
 
-            let tasks = [];
-            if (enhancerAddCurrencyOtherParam) {
-                tasks.push([
-                    enhancerAddCurrencyOtherParam.split(","),
-                    function() {
-                        jQuery("#inventory_select_their_inventory").click()
-                    },
-                ]);
-            }
+            let autoAddSelfInventory = null;
             if (enhancerAddCurrencySelfParam) {
-                tasks.push([
-                    enhancerAddCurrencySelfParam.split(","),
-                  function() {
-                      jQuery("#inventory_select_your_inventory").click()
-                  },
-                ]);
+                autoAddSelfInventory = enhancerAddCurrencySelfParam.split(",");
+            }
+            let autoAddSelfFocusFunc = function() {
+                jQuery("#inventory_select_your_inventory").click();
             }
 
-            // Set up a MutationObserver callback to run when the inventory is loaded
+            let autoAddOtherInventory = null;
+            if (enhancerAddCurrencyOtherParam) {
+                autoAddOtherInventory = enhancerAddCurrencyOtherParam.split(",");
+            }
+            let autoAddOtherFocusFunc = function() {
+                jQuery("#inventory_select_their_inventory").click();
+            }
+
+            // Set up two MutationObservers to run when the inventory on both sides is loaded
+            const inventoryStatusElement = document.getElementById("trade_inventory_unavailable");
+
             function connectObserver (mutationObserver) {
                 mutationObserver.observe(
-                  inventoriesElement,
+                  inventoryStatusElement,
                   {
                       attributes: true,
-                      attributeFilter: ["style"]
                   }
                 )
             }
 
-            const inventoriesElement = document.getElementById("trade_inventory_unavailable");
-            const inventoriesInitiallyAvailableObserver = new MutationObserver(function() {
-                inventoriesInitiallyAvailableObserver.disconnect();
+            const mySteamID = g_steamID;
+            const partnerSteamID = g_ulTradePartnerSteamID;
+            const appID = 440;
 
-                setTimeout(function () {
-                    console.log("\"enhancerAddCurrencySelf/Other\" is present, personal inventory ready");
+            function inventoryListIsReady (userSteamID, inventoryAppID) {
+                const loadedInventories = [
+                    ...document.querySelectorAll("div.inventory_ctn[id^='inventory_']")
+                ];
 
-                    // TODO Might want to look into doing this with promises, this is absolutely unreadable
-                    // For any poor soul reading this: this just pops two elements from the tasks array
-                    // and runs processNextMatch on them with slightly altered arguments.
-                    autoAddInProgress();
-                    const nextTask = tasks.pop();
-                    if (nextTask) {
-                        const [taskArray, setupFunc] = nextTask;
-                        setupFunc();
+                const requiredInventoryLoaded = loadedInventories.filter(function (element) {
+                    return element.id.startsWith(`inventory_${userSteamID}_${inventoryAppID}`);
+                }).length === 1;
+                const inventoryStatusNotLoading = inventoryStatusElement.style.display === "none";
 
-                        processNextMatch(taskArray, 0, tasks.length < 1, function () {
-                            const nextTask = tasks.pop();
-                            if (nextTask) {
-                                const [taskArray, setupFunc] = nextTask;
-                                setupFunc();
+                return requiredInventoryLoaded && inventoryStatusNotLoading;
+            }
 
-                                const otherInventoryAvailableObserver = new MutationObserver(function () {
-                                    otherInventoryAvailableObserver.disconnect();
-                                    console.log("\"enhancerAddCurrencyOther\" is present, other inventory ready");
+            const myInventoryAvailableObserver = new MutationObserver(function () {
+                if (inventoryListIsReady(mySteamID, appID)) {
+                    myInventoryAvailableObserver.disconnect();
+                    logger.success("User inventory is available, running auto-add.");
 
-                                    processNextMatch(taskArray, 0, true);
-                                });
-                                connectObserver(otherInventoryAvailableObserver);
-                            }
-                        });
+                    const runAutoAddForOther = function () {
+                        if (autoAddOtherInventory !== null) {
+                            // Should automatically trigger otherInventoryAvailableObserver
+                            // and auto-load the items
+                            autoAddOtherFocusFunc();
+                        }
                     }
-                }, 100);
+
+                    // Run the self auto-add task, then run the auto-add for the partner
+                    if (autoAddSelfInventory !== null) {
+                        autoAddInProgress();
+                        processNextMatch(
+                            autoAddSelfInventory, 0,
+                            autoAddOtherInventory === null,
+                            runAutoAddForOther,
+                        );
+
+                    } else {
+                        runAutoAddForOther();
+                    }
+                }
             });
 
-            connectObserver(inventoriesInitiallyAvailableObserver);
+            const otherInventoryAvailableObserver = new MutationObserver(function () {
+                if (inventoryListIsReady(partnerSteamID, appID)) {
+                    otherInventoryAvailableObserver.disconnect();
+                    logger.success("Trade partner inventory is available, running auto-add.");
+
+                    if (autoAddOtherInventory !== null) {
+                        autoAddInProgress();
+                        processNextMatch(
+                            autoAddOtherInventory, 0,
+                            true,
+                            function () {
+                                autoAddSelfFocusFunc();
+                            },
+                        );
+
+                    }
+                }
+            });
+
+            connectObserver(myInventoryAvailableObserver);
+            connectObserver(otherInventoryAvailableObserver);
 
         }
     }

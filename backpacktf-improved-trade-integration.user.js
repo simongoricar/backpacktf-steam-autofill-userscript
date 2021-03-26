@@ -6,6 +6,7 @@
 // @include     https://backpack.tf/stats/*
 // @version     1.0.0
 // @author      DefaultSimon
+// @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @run-at      document-idle
 // ==/UserScript==
@@ -50,18 +51,21 @@ jQuery(function () {
         border-color: rgb(32,158,108);
         box-shadow: rgb(17,112,74) 1px -1px 10px -4px;
     }
+    .listing-buttons a.bptf-enhancer-inaccurate {
+        background-color: rgb(150,99,44);
+        border-color: rgb(158,97,32);
+        box-shadow: rgb(112,66,17) 1px -1px 10px -4px;
+    }
     </style>`;
     jQuery(globalCss).appendTo("head");
 
-    const descriptionCurrencyRegex = /(\d+(?:\.\d+)?)\s?(keys?|ref)/ig;
+    const descriptionCurrencyRegex = /(\d+(?:\.\d+)?)\s?(keys?|ref)/iug;
 
     // Gather all classifields on the page
     const orderColumns = jQuery(".media-list");
 
     const sellOrders = jQuery(orderColumns[0]).find(".listing");
     const buyOrders = jQuery(orderColumns[1]).find(".listing");
-    console.log(sellOrders);
-    console.log(buyOrders);
 
     function processClassifield(JQElement, orderType) {
         let currencyString = JQElement.find(".tag.bottom-right span").text();
@@ -81,7 +85,7 @@ jQuery(function () {
           .prepend("<span class='bptf-enhancer-currency-status'></span>");
         const statusElement = JQElement.find(".bptf-enhancer-currency-status");
 
-        statusElement.text("loading");
+        statusElement.text("(loading)");
 
         let totalCurrencyMap = {
             "key": 0,
@@ -89,6 +93,7 @@ jQuery(function () {
             "rec": 0,
             "scrap": 0,
         }
+        let isAccurate = true;
 
         if (currencyType === "key" || currencyType === "keys") {
             /*
@@ -105,7 +110,7 @@ jQuery(function () {
 
                 // Try processing the description first
                 const matchesArray = [...descriptionString.matchAll(descriptionCurrencyRegex)];
-                if (matchesArray.length >= 1) {
+                if (matchesArray.length === 2) {
                     for (let i = 0; i < matchesArray.length; i++) {
                         const match = matchesArray[i];
                         if (match.length !== 3) {
@@ -127,9 +132,10 @@ jQuery(function () {
                         }
                     }
                 } else {
+                    // INACCURATE
                     // Fall back to keys, the rest will be up to the user
-                    // TODO should this just not do anything?
                     totalCurrencyMap.key = flooredKeys;
+                    isAccurate = false;
                 }
             }
         } else if (currencyType === "ref") {
@@ -159,7 +165,11 @@ jQuery(function () {
                 encodedCurrencyArrayHuman.push(`${amount} ${name}`);
             }
         }
-        statusElement.text(`(${encodedCurrencyArrayHuman.join(", ")})`)
+        if (isAccurate) {
+            statusElement.text(`(${encodedCurrencyArrayHuman.join(", ")})`)
+        } else {
+            statusElement.html(`(inaccurate: ${encodedCurrencyArrayHuman.join(", ")})`)
+        }
 
         // Update the link to automatically load the required currency when opened
         const tradeButton = JQElement.find(
@@ -171,7 +181,7 @@ jQuery(function () {
         tradeButton.attr("href", `${previousHref}&enhancerAddCurrency${paramEnhancerAddType}=${encodedCurrency}`)
 
         // Make the trade button look slightly glowy
-        tradeButton.addClass("bptf-enhancer-done");
+        tradeButton.addClass(isAccurate ? "bptf-enhancer-done" : "bptf-enhancer-inaccurate");
 
         // console.log(totalCurrencyMap);
         // console.log("[" + encodedCurrency + "] " + descriptionString);

@@ -6,6 +6,7 @@
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
 // @version     1.5
 // @author      HusKy, improvements by DefaultSimon
+// @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @run-at      document-idle
 // ==/UserScript==
@@ -818,12 +819,22 @@ jQuery(function () {
             }
 
             // Set up a MutationObserver callback to run when the inventory is loaded
+            function connectObserver (mutationObserver) {
+                mutationObserver.observe(
+                  inventoriesElement,
+                  {
+                      attributes: true,
+                      attributeFilter: ["style"]
+                  }
+                )
+            }
 
             const inventoriesElement = document.getElementById("trade_inventory_unavailable");
-            const inventoriesAvailableObserver = new MutationObserver(function() {
-                inventoriesAvailableObserver.disconnect();
+            const inventoriesInitiallyAvailableObserver = new MutationObserver(function() {
+                inventoriesInitiallyAvailableObserver.disconnect();
+
                 setTimeout(function () {
-                    console.log("\"enhancerAddCurrency\" is present, inventories ready, running");
+                    console.log("\"enhancerAddCurrencySelf/Other\" is present, personal inventory ready");
 
                     // TODO Might want to look into doing this with promises, this is absolutely unreadable
                     // For any poor soul reading this: this just pops two elements from the tasks array
@@ -831,29 +842,29 @@ jQuery(function () {
                     autoAddInProgress();
                     const nextTask = tasks.pop();
                     if (nextTask) {
-                        const [taskArray, func] = nextTask;
-                        func();
+                        const [taskArray, setupFunc] = nextTask;
+                        setupFunc();
 
                         processNextMatch(taskArray, 0, tasks.length < 1, function () {
                             const nextTask = tasks.pop();
                             if (nextTask) {
-                                const [taskArray, func] = nextTask;
-                                func();
+                                const [taskArray, setupFunc] = nextTask;
+                                setupFunc();
 
-                                processNextMatch(taskArray, 0, true);
+                                const otherInventoryAvailableObserver = new MutationObserver(function () {
+                                    otherInventoryAvailableObserver.disconnect();
+                                    console.log("\"enhancerAddCurrencyOther\" is present, other inventory ready");
+
+                                    processNextMatch(taskArray, 0, true);
+                                });
+                                connectObserver(otherInventoryAvailableObserver);
                             }
                         });
                     }
                 }, 100);
             });
 
-            inventoriesAvailableObserver.observe(
-                inventoriesElement,
-                {
-                    attributes: true,
-                    attributeFilter: ["style"]
-                }
-            )
+            connectObserver(inventoriesInitiallyAvailableObserver);
 
         }
     }

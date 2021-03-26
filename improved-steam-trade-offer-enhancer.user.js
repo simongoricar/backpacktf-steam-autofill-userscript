@@ -4,7 +4,7 @@
 // @description Userscript to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.5.1
+// @version     1.5.2dev
 // @author      HusKy, improvements by DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
@@ -12,6 +12,9 @@
 // ==/UserScript==
 
 /// CHANGELOG
+// 1.5.2
+//  - Improve auto-add speed
+//
 // 1.5.1
 //  - Fix auto-add status not showing properly
 //  - Add @updateURL for Tampermonkey
@@ -29,25 +32,25 @@
 //    Useful with the "backpack.tf Trade Offer Enhancer integration".
 ///
 
-const logStylesArray = [
+const logStyles = [
     "background-color: #D57F2A",
     "color: #000",
     "font-weight: bold",
     "padding: 2px 3px",
     "border-radius: 2px",
-];
-const informationalStylesArray = [
+].join(";");
+const informationalStyles = [
     "color: #81BF40",
-];
-const warningStylesArray = [
+].join(";");
+const warningStyles = [
     "color: #E0981F",
-];
-const errorStylesArray = [
+].join(";");
+const errorStyles = [
     "color: #E71748",
-];
-const successStylesArray = [
+].join(";");
+const successStyles = [
     "color: #37C865",
-];
+].join(";");
 
 /**
  * Simple Logger that prepends the instance name.
@@ -64,20 +67,19 @@ class Logger {
         // Stringify only if it is an object
         const value = message instanceof Object ? JSON.stringify(message) : message;
 
-        const boxStyles = logStylesArray.join(";");
-
         let textStyles = null;
+        // TODO make this into a map
         if (type === "informational") {
-            textStyles = informationalStylesArray.join(";");
+            textStyles = informationalStyles;
         } else if (type === "warning") {
-            textStyles = warningStylesArray.join(";");
+            textStyles = warningStyles;
         } else if (type === "error") {
-            textStyles = errorStylesArray.join(";");
+            textStyles = errorStyles;
         } else if (type === "success") {
-            textStyles = successStylesArray.join(";");
+            textStyles = successStyles;
         }
 
-        return [`%c${this.name}%c ${value}`, boxStyles, textStyles];
+        return [`%c${this.name}%c ${value}`, logStyles, textStyles];
     }
 
     info(message) {
@@ -866,6 +868,7 @@ jQuery(function () {
                     }
 
                     setItemSearchAndUpdate(searchTerm);
+                    // TODO detect when the search is updated or don't search at all! (maybe filter without searching?)
                     setTimeout(function () {
                         const inventoryLoadedItems = collectSearchedItems();
 
@@ -887,7 +890,7 @@ jQuery(function () {
                         setTimeout(function () {
                             tradeOfferWindow.summarise();
                             return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
-                        }, currencyAmount * 50 + 500);
+                        }, currencyAmount * 50 + 100);
                     }, 1000);
                 } catch (e) {
                     logger.error("Something went wrong while automatically adding currency: " + e);
@@ -930,7 +933,7 @@ jQuery(function () {
             const partnerSteamID = g_ulTradePartnerSteamID;
             const appID = 440;
 
-            function inventoryListIsReady (userSteamID, inventoryAppID) {
+            function isInventoryListReady (userSteamID, inventoryAppID) {
                 const loadedInventories = [
                     ...document.querySelectorAll("div.inventory_ctn[id^='inventory_']")
                 ];
@@ -944,7 +947,8 @@ jQuery(function () {
             }
 
             const myInventoryAvailableObserver = new MutationObserver(function () {
-                if (inventoryListIsReady(mySteamID, appID)) {
+                if (isInventoryListReady(mySteamID, appID)) {
+                    console.log(collectSearchedItems());
                     myInventoryAvailableObserver.disconnect();
                     logger.success("User inventory is available, running auto-add.");
 
@@ -972,7 +976,7 @@ jQuery(function () {
             });
 
             const otherInventoryAvailableObserver = new MutationObserver(function () {
-                if (inventoryListIsReady(partnerSteamID, appID)) {
+                if (isInventoryListReady(partnerSteamID, appID)) {
                     otherInventoryAvailableObserver.disconnect();
                     logger.success("Trade partner inventory is available, running auto-add.");
 

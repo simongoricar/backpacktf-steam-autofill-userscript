@@ -52,12 +52,13 @@ jQuery(function () {
         font-size: 11px;
         margin-right: 2px;
     }
-    .listing-buttons a.bptf-enhancer-done {
+    /* Fighting specificity */
+    .listing-buttons a.bptf-enhancer-done.bptf-enhancer-done {
         background-color: rgb(44,150,108);
         border-color: rgb(32,158,108);
         box-shadow: rgb(17,112,74) 1px -1px 10px -4px;
     }
-    .listing-buttons a.bptf-enhancer-inaccurate {
+    .listing-buttons a.bptf-enhancer-inaccurate.bptf-enhancer-inaccurate {
         background-color: rgb(150,99,44);
         border-color: rgb(158,97,32);
         box-shadow: rgb(112,66,17) 1px -1px 10px -4px;

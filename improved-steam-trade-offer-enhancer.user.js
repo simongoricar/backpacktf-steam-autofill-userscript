@@ -13,7 +13,7 @@
 
 /// CHANGELOG
 // 1.5.2
-//  - Improve auto-add speed
+//  - Huge improvement to the auto-add speed! (doesn't manually search anymore)
 //
 // 1.5.1
 //  - Fix auto-add status not showing properly
@@ -639,6 +639,14 @@ jQuery(function () {
             });
         }
 
+        /**
+         * Given a predicate (true/false) function, filter the searched items.
+         */
+        function filterSearchedItems (predicate) {
+            const searchedItems = collectSearchedItems();
+            return searchedItems.filter(predicate);
+        }
+
         function getAddInputAmount () {
             return parseInt(jQuery("input#amount_control").val());
         }
@@ -727,19 +735,20 @@ jQuery(function () {
 
         // Added url parameter to automatically add some currency on your or the other trader's side
         // The parameters are "enhancerAddCurrencySelf" and "enhancerAddCurrencyOther", the format is:
-        //     comma-separated currencies, e.g. "...&enhancerAddCurrency=1key,3.44ref&..."
+        //     comma-separated currencies, e.g. "...&enhancerAddCurrencySelf=1key,3.44ref&..."
         //     Supported currencies: "key", "ref", "rec", "scrap"
         //
-        // Usage: loading the tradeoffer page with this parameter set will add
-        // the specified amount of currency to your side automatically.
-        // Combine with an external bptf script for maximum efficiency ;)
-        const currencyTypeToSearchTermMap = {
-            // Search terms to filter to just the keys
-            "key": "Mann Co. Supply Crate Key Level 5 Tool",
-            "ref": "Refined Metal Level 3 Craft Item",
-            "rec": "Reclaimed Metal Level 2 Craft Item",
-            "scrap": "Scrap Metal Level 1 Craft Item",
-        };
+        // Usage: loading the trade offer page with this parameter set will add
+        // the specified amount of currency to your/your trade partner's side automatically.
+        // Combine with the backpack.tf integration for maximum efficiency ;)
+
+        const currencyDefindexes = {
+            // https://wiki.alliedmods.net/Team_Fortress_2_Item_Definition_Indexes
+            key: 5021,
+            ref: 5002,
+            rec: 5001,
+            scrap: 5000,
+        }
         // TODO allow for e.g. "4.33ref" (though this is handled by the bptf integration anyway)
 
         const enhancerAddCurrencySelfParam = getUrlParameter("enhancerAddCurrencySelf");
@@ -861,37 +870,47 @@ jQuery(function () {
                     let currencyAmount = parseInt(matched[1]);
                     let currencyType = matched[2];
 
-                    let searchTerm = currencyTypeToSearchTermMap[currencyType];
-                    if (searchTerm === undefined) {
+                    const currencyDefindex = currencyDefindexes[currencyType];
+                    if (currencyDefindex === undefined) {
                         logger.warn("Format was not recognized: " + array[index]);
                         return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
-                    setItemSearchAndUpdate(searchTerm);
-                    // TODO detect when the search is updated or don't search at all! (maybe filter without searching?)
+                    // Filter the inventory to JUST the currency we need
+                    // (there is no actual search, it just filters the array)
+                    const matchingLoadedItems = filterSearchedItems(function (key, item) {
+                        const rgItem = item.rgItem;
+                        const defIndex = parseInt((rgItem.app_data || {}).def_index);
+
+                        if (typeof defIndex === "undefined") {
+                            logger.warn(`Error while filtering, something is wrong with rgItem: ${rgItem}`)
+                            console.log(item);
+                            return false;
+                        }
+
+                        return defIndex === currencyDefindex;
+                    });
+
+                    // Warn the user if not enough users
+                    if (currencyAmount > matchingLoadedItems.length) {
+                        let missingAmount = currencyAmount - matchingLoadedItems.length;
+                        missingCurrencyAmount[currencyType] += missingAmount;
+
+                        hadMissingCurrencyDuringLoad = true;
+                        autoAddError();
+                    }
+
+                    // Move items
+                    const itemAmountToAdd = Math.min(currencyAmount, matchingLoadedItems.length);
+                    for (let i = 0; i < itemAmountToAdd; i++) {
+                        setTimeout(MoveItemToTrade, i * 50, matchingLoadedItems[i]);
+                    }
+
                     setTimeout(function () {
-                        const inventoryLoadedItems = collectSearchedItems();
-
-                        // Warn the user if not enough users
-                        if (currencyAmount > inventoryLoadedItems.length) {
-                            let missingAmount = currencyAmount - inventoryLoadedItems.length;
-                            missingCurrencyAmount[currencyType] += missingAmount;
-
-                            hadMissingCurrencyDuringLoad = true;
-                            autoAddError();
-                        }
-
-                        // Move items
-                        const itemAmountToAdd = Math.min(currencyAmount, inventoryLoadedItems.length);
-                        for (let i = 0; i < itemAmountToAdd; i++) {
-                            setTimeout(MoveItemToTrade, i * 50, inventoryLoadedItems[i]);
-                        }
-
-                        setTimeout(function () {
-                            tradeOfferWindow.summarise();
-                            return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
-                        }, currencyAmount * 50 + 100);
-                    }, 1000);
+                        tradeOfferWindow.summarise();
+                        return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
+                    }, currencyAmount * 50 + 100);
+                    // }, 1000);
                 } catch (e) {
                     logger.error("Something went wrong while automatically adding currency: " + e);
                     return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);

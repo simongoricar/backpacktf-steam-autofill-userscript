@@ -4,12 +4,18 @@
 // @description An integration with Improved HusKy's Steam Trade Offer Enhancer. Automatically adds the required amount of currency on your side.
 // @include     https://backpack.tf/classifieds*
 // @include     https://backpack.tf/stats/*
-// @version     1.0.0
+// @version     1.0.1
 // @author      DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @run-at      document-idle
 // ==/UserScript==
+
+/// CHANGELOG
+// 1.0.1
+//  - Improve currency detection
+//  - Improve UI elements
+//
 
 /**
  * Convert a (possibly decimal) value of refined into refined, reclaimed and scrap.

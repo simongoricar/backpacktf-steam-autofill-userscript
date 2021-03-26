@@ -834,7 +834,7 @@ jQuery(function () {
                         const [taskArray, func] = nextTask;
                         func();
 
-                        processNextMatch(taskArray, 0, false, function () {
+                        processNextMatch(taskArray, 0, tasks.length < 1, function () {
                             const nextTask = tasks.pop();
                             if (nextTask) {
                                 const [taskArray, func] = nextTask;

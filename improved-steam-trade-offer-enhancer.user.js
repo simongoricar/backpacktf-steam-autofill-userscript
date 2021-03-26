@@ -14,6 +14,7 @@
 /// CHANGELOG
 // 1.5.2
 //  - Huge improvement to the auto-add speed! (doesn't manually search anymore)
+//  - Renamed auto-add parameters: now "enhancerAddCurrencySelf" and "enhancerAddCurrencyPartner".
 //
 // 1.5.1
 //  - Fix auto-add status not showing properly
@@ -32,6 +33,11 @@
 //    Useful with the "backpack.tf Trade Offer Enhancer integration".
 ///
 
+/*
+ * LOGGER
+ * A simple Logger that prepends the instance name.
+ * Format: "[LoggerName] <your message>"
+ */
 const logStyles = [
     "background-color: #D57F2A",
     "color: #000",
@@ -52,10 +58,6 @@ const successStyles = [
     "color: #37C865",
 ].join(";");
 
-/**
- * Simple Logger that prepends the instance name.
- * Format: "[LoggerName] <your message>"
- */
 class Logger {
     constructor(name) {
         this.name = name;
@@ -106,19 +108,13 @@ class Logger {
 const logger = new Logger("STEAM TRADE ENHANCER");
 
 const params = new URLSearchParams(window.location.search);
-
 function getUrlParameter(parameterName) {
     return params.get(parameterName);
 }
 
-function setItemSearchAndUpdate(searchTerm) {
-    // Set the input value
-    jQuery("#filter_control").val(searchTerm)
-
-    // Trigger UI update
-    let keyupEvent = new Event("keyup");
-    document.getElementById("filter_control").dispatchEvent(keyupEvent);
-}
+/*
+ * CONSTANTS
+ */
 
 // array of dangerous descriptions
 let dangerous_descriptions = [
@@ -140,7 +136,191 @@ let rare_TF2_keys = [
     "5762"
 ];
 
-let tradeOfferPage = {
+const style =
+`<style type="text/css">
+    .tradeoffer_items_summary {
+        color: #fff;
+        font-size: 10px;
+    }
+
+    .warning {
+        color: #ff4422;
+    }
+
+    .info {
+        padding: 1px 3px;
+        border-radius: 4px;
+        background-color: #1155FF;
+        border: 1px solid #003399;
+        font-size: 14px;
+    }
+
+    .summary_item {
+        padding: 3px;
+        margin: 0 2px 2px 0;
+        background-color: #3C352E;
+        background-position: center;
+        background-size: 48px 48px;
+        background-repeat: no-repeat;
+        border: 1px solid;
+        font-size: 16px;
+        width: 48px;
+        height: 48px;
+        display: inline-block;
+    }
+
+    .summary_badge {
+        padding: 1px 3px;
+        border-radius: 4px;
+        background-color: #0099CC;
+        border: 1px solid #003399;
+        font-size: 12px;
+    }
+
+    .btn_custom {
+        border-width: 0;
+        background-color: black;
+        border-radius: 2px;
+        font-family: Arial, serif;
+        color: white;
+        line-height: 20px;
+        font-size: 12px;
+        padding: 0 15px;
+        vertical-align: middle;
+        cursor: pointer;
+    }
+
+    #headingAddMultipleItems {
+        margin-bottom: 4px;
+        margin-left: 2px;
+    }
+
+    .item_adder #btn_additems {
+        margin-left: 5px;
+        margin-bottom: 2px;
+        font-weight: bold;
+    }
+
+    .item_adder #btn_additems.warning {
+        background-color: #a44631;
+        font-style: italic;
+    }
+
+    #itemcount-warning {
+        font-size: 0.9rem;
+        margin-top: 4px;
+        margin-left: 1px;
+        min-height: 20px;
+    }
+
+    @keyframes autoAddFinished {
+        0% { transform: scale(1) }
+        60% { transform: scale(1.1) }
+        100% { transform: scale(1) }
+    }
+
+    .filter_control_ctn.finishedAnimation {
+        animation-name: autoAddFinished;
+        animation-fill-mode: forwards;
+        animation-iteration-count: 3;
+        animation-timing-function: cubic-bezier(0.75, 0.25, 0.44, 0.87);
+        animation-duration: .35s;
+    }
+
+    .autoadd-status-container {
+        font-size: 0.9rem;
+        margin-left: 1px;
+        position: relative;
+        top: 6px;
+    }
+
+    .autoadd-status-container .status {
+        font-size: 0.85rem;
+        font-weight: bold;
+    }
+    .autoadd-status-container .status.waiting {
+        color: rgb(135,159,203);
+    }
+    .autoadd-status-container .status.in-progress {
+        color: rgb(210,170,255);
+    }
+    .autoadd-status-container .status.error {
+        color: rgb(255,177,170);
+    }
+    .autoadd-status-container .status.done {
+        color: rgb(51,191,41);
+    }
+    .autoadd-status-container .status.done-error {
+        color: rgb(186,191,41);
+    }
+</style>`;
+
+const tradeBoxAfterHTML =
+`
+    <div class="trade_rule selectableNone"></div>
+    <div class="item_adder">
+        <div id="headingAddMultipleItems" class="selectableNone">Add multiple items:</div>
+        <input id="amount_control" class="filter_search_box" type="text" placeholder="16">
+        <button id="btn_additems" type="button" class="btn_custom">Add</button>
+        <div id="itemcount-warning" style="font-size: 0.9rem"></div>
+        <br><br>
+        <button id="btn_clearmyitems" type="button" class="btn_custom">Clear my items</button>
+        <button id="btn_cleartheiritems" type="button" class="btn_custom">Clear their items</button>
+    </div>
+    <div class="trade_rule selectableNone"></div>
+    <div class="tradeoffer_items_summary"></div>
+`;
+
+const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
+
+/*
+ * USEFUL FUNCTIONS
+ */
+
+/**
+ * Returns an Object containing items currently filtered (not just shown) in the trade window.
+ */
+function collectSearchedItems () {
+    let inventory = jQuery("div.inventory_ctn:visible");
+
+    return inventory.find("div.itemHolder").filter(function () {
+        return jQuery(this).css("display") !== "none";
+    }).find("div.item").filter(function () {
+        return jQuery(this).css("display") !== "none";
+    });
+}
+
+/**
+ * Given a predicate (true/false) function, filter the items from `collectSearchedItems`.
+ */
+function filterSearchedItems (predicate) {
+    const searchedItems = collectSearchedItems();
+    return searchedItems.filter(predicate);
+}
+
+/**
+ * Returns the amount of items the user requested to add.
+ */
+function getAddItemButtonAmount () {
+    return parseInt(jQuery("input#amount_control").val());
+}
+
+/**
+ * Will return a comma-delimited string formatted in a readable way.
+ */
+function constructMissingCurrencyString (missingCurrencyAmountObject) {
+    const missingCurrencyArray = [];
+    for (let [key, value] of Object.entries(missingCurrencyAmountObject)) {
+        if (value > 0) {
+            missingCurrencyArray.push(`${value} ${key}`);
+        }
+    }
+
+    return missingCurrencyArray.join(", ");
+}
+
+
+const tradeOfferPage = {
     evaluate_items: function (items) {
         let result = {};
 
@@ -214,7 +394,7 @@ let tradeOfferPage = {
     }
 };
 
-let tradeOfferWindow = {
+const tradeOfferWindow = {
     evaluate_items: function (items) {
         let result = {};
         result._total = 0;
@@ -424,133 +604,19 @@ let tradeOfferWindow = {
     }
 };
 
-// Executed on page load
+/*
+ * EXECUTED ON DOCUMENT READY
+ */
 jQuery(function () {
     let location = window.location.pathname;
 
     // Append CSS styles
-    const style = `
-        <style type="text/css">
-            .tradeoffer_items_summary {
-                color: #fff;
-                font-size: 10px;
-            }
-
-            .warning {
-                color: #ff4422;
-            }
-
-            .info {
-                padding: 1px 3px;
-                border-radius: 4px;
-                background-color: #1155FF;
-                border: 1px solid #003399;
-                font-size: 14px;
-            }
-
-            .summary_item {
-                padding: 3px;
-                margin: 0 2px 2px 0;
-                background-color: #3C352E;
-                background-position: center;
-                background-size: 48px 48px;
-                background-repeat: no-repeat;
-                border: 1px solid;
-                font-size: 16px;
-                width: 48px;
-                height: 48px;
-                display: inline-block;
-            }
-
-            .summary_badge {
-                padding: 1px 3px;
-                border-radius: 4px;
-                background-color: #0099CC;
-                border: 1px solid #003399;
-                font-size: 12px;
-            }
-
-            .btn_custom {
-                border-width: 0;
-                background-color: black;
-                border-radius: 2px;
-                font-family: Arial, serif;
-                color: white;
-                line-height: 20px;
-                font-size: 12px;
-                padding: 0 15px;
-                vertical-align: middle;
-                cursor: pointer;
-            }
-
-            #headingAddMultipleItems {
-                margin-bottom: 4px;
-                margin-left: 2px;
-            }
-
-            .item_adder #btn_additems {
-                margin-left: 5px;
-                margin-bottom: 2px;
-                font-weight: bold;
-            }
-
-            .item_adder #btn_additems.warning {
-                background-color: #a44631;
-                font-style: italic;
-            }
-
-            #itemcount-warning {
-                font-size: 0.9rem;
-                margin-top: 4px;
-                margin-left: 1px;
-                min-height: 20px;
-            }
-
-            @keyframes autoAddFinished {
-                0% { transform: scale(1) }
-                60% { transform: scale(1.1) }
-                100% { transform: scale(1) }
-            }
-
-            .filter_control_ctn.finishedAnimation {
-                animation-name: autoAddFinished;
-                animation-fill-mode: forwards;
-                animation-iteration-count: 3;
-                animation-timing-function: cubic-bezier(0.75, 0.25, 0.44, 0.87);
-                animation-duration: .35s;
-            }
-
-            .autoadd-status-container {
-                font-size: 0.9rem;
-                margin-left: 1px;
-                position: relative;
-                top: 6px;
-            }
-
-            .autoadd-status-container .status {
-                font-size: 0.85rem;
-                font-weight: bold;
-            }
-            .autoadd-status-container .status.waiting {
-                color: rgb(135,159,203);
-            }
-            .autoadd-status-container .status.in-progress {
-                color: rgb(210,170,255);
-            }
-            .autoadd-status-container .status.error {
-                color: rgb(255,177,170);
-            }
-            .autoadd-status-container .status.done {
-                color: rgb(51,191,41);
-            }
-            .autoadd-status-container .status.done-error {
-                color: rgb(186,191,41);
-            }
-        </style>`;
     jQuery(style).appendTo("head");
 
     if (location.indexOf("tradeoffers") > -1) {
-        // Trade offer page with multiple trade offers
+        /*
+         * PAGE TYPE: Multiple trade offers
+         */
 
         // Retrieve all trade offers.
         let trade_offers = jQuery("div.tradeoffer");
@@ -590,29 +656,22 @@ jQuery(function () {
         }
 
     } else if (location.indexOf("tradeoffer") > -1) {
-        // Single trade offer window
+        /*
+         * PAGE TYPE: Single trade offer window
+         */
 
-        // Append new divs
-        jQuery("div.trade_left div.trade_box_contents").append(`
-            <div class="trade_rule selectableNone"></div>
-            <div class="item_adder">
-                <div id="headingAddMultipleItems" class="selectableNone">Add multiple items:</div>
-                <input id="amount_control" class="filter_search_box" type="text" placeholder="16">
-                <button id="btn_additems" type="button" class="btn_custom">Add</button>
-                <div id="itemcount-warning" style="font-size: 0.9rem"></div>
-                <br><br>
-                <button id="btn_clearmyitems" type="button" class="btn_custom">Clear my items</button>
-                <button id="btn_cleartheiritems" type="button" class="btn_custom">Clear their items</button>
-            </div>
-            <div class="trade_rule selectableNone"></div>
-            <div class="tradeoffer_items_summary"></div>
-        `);
+        // Append custom HTMl content
+        jQuery("div.trade_left div.trade_box_contents").append(tradeBoxAfterHTML);
 
-        // Refresh summaries whenever ...
+        // Refresh summaries on any user interaction
+        // Added debounce for a performance improvement
+        // This way, the summary will be drawn after 300ms of idle time (no clicks)
+        let debounceTimeout;
         jQuery("body").click(function () {
-            setTimeout(function () {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(function () {
                 tradeOfferWindow.summarise();
-            }, 500);
+            }, 300);
         });
 
         // hack to fix empty space under inventory
@@ -629,58 +688,45 @@ jQuery(function () {
             }
         }, 500);
 
-        function collectSearchedItems () {
-            let inventory = jQuery("div.inventory_ctn:visible");
-
-            return inventory.find("div.itemHolder").filter(function () {
-                return jQuery(this).css("display") !== "none";
-            }).find("div.item").filter(function () {
-                return jQuery(this).css("display") !== "none";
-            });
-        }
-
-        /**
-         * Given a predicate (true/false) function, filter the searched items.
-         */
-        function filterSearchedItems (predicate) {
-            const searchedItems = collectSearchedItems();
-            return searchedItems.filter(predicate);
-        }
-
-        function getAddInputAmount () {
-            return parseInt(jQuery("input#amount_control").val());
-        }
-
         // Handle item auto adder
         const btnAddItemsElement = jQuery("button#btn_additems");
+        const amountControlElement = jQuery("input#amount_control");
 
         btnAddItemsElement.click(function () {
             // Do not add items if the offer cannot be modified
             if (jQuery("div.modify_trade_offer:visible").length > 0) return;
 
-            const items = collectSearchedItems();
+            const inventoryItems = collectSearchedItems();
+            let amount = getAddItemButtonAmount();
 
-            // Get amount value
-            let amount = getAddInputAmount();
-            if (isNaN(amount)) amount = 16;
-            if (items.length < amount) amount = items.length;
-
-            // Add all items
-            for (let i = 0; i < amount; i++) {
-                setTimeout(MoveItemToTrade, i * 50, items[i]);
+            if (isNaN(amount)) {
+                amount = 16;
+            }
+            if (inventoryItems.length < amount) {
+                amount = inventoryItems.length;
             }
 
-            // Refresh summaries
+            // Add the correct amount of items
+            for (let i = 0; i < amount; i++) {
+                // i * 50 queues the function calls 50ms apart
+                setTimeout(MoveItemToTrade, i * 50, inventoryItems[i]);
+            }
+
+            // This is reached before the MoveItemToTrade functions have even been called
+            // This is why here is another timeout, set to trigger 500ms after the final MoveItemToTrade call.
             setTimeout(function () {
+                // Refresh summaries
                 tradeOfferWindow.summarise();
             }, amount * 50 + 500);
         });
 
-        const amountControlElement = jQuery("input#amount_control");
-
-        function checkUserHasEnoughItems () {
+        /**
+         * Will check if the user has enough items.
+         * Will not return anything, but will update the UI accordingly.
+         */
+        function verifyUserHasEnoughItems () {
             const items = collectSearchedItems();
-            const amountWanted = getAddInputAmount() || 0;
+            const amountWanted = getAddItemButtonAmount() || 0;
 
             const btnAddItemsElement = jQuery(".item_adder #btn_additems");
             const ItemCountWarningElement = jQuery("#itemcount-warning");
@@ -688,15 +734,18 @@ jQuery(function () {
             if (amountWanted > items.length) {
                 btnAddItemsElement.addClass("warning");
                 btnAddItemsElement.prop("disabled", true);
-                ItemCountWarningElement.html(`<b>Warning:</b> you only have <b>${items.length}</b> items of this type!`);
+                ItemCountWarningElement.html(
+                    `<b>Warning:</b> you only have <b>${items.length}</b> items of this type!`
+                );
             } else {
                 btnAddItemsElement.removeClass("warning");
                 btnAddItemsElement.prop("disabled", false);
                 ItemCountWarningElement.text("");
             }
         }
-        amountControlElement.keyup(checkUserHasEnoughItems);
-        amountControlElement.change(checkUserHasEnoughItems);
+
+        amountControlElement.keyup(verifyUserHasEnoughItems);
+        amountControlElement.change(verifyUserHasEnoughItems);
 
         jQuery("button#btn_clearmyitems").click(function () {
             tradeOfferWindow.clear("div#your_slots");
@@ -722,19 +771,32 @@ jQuery(function () {
             RefreshTradeStatus(g_rgCurrentTradeStatus, true);
         }
 
+        // Display warnings if you or your trade partner have an escrow
         if (unsafeWindow.g_daysMyEscrow > 0) {
             let hours = unsafeWindow.g_daysMyEscrow * 24;
-            jQuery("div.trade_partner_headline").append("<div class='warning'>(You do not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>");
+            jQuery("div.trade_partner_headline")
+                .append(
+                    `<div class='warning'>
+                        (You do not have mobile confirmations enabled.
+                        Items will be held for <b>${hours}</b> hours.)
+                    </div>`
+                );
         }
 
         if (unsafeWindow.g_daysTheirEscrow > 0) {
             let hours = unsafeWindow.g_daysTheirEscrow * 24;
-            jQuery("div.trade_partner_headline").append("<div class='warning'>(Other user does not have mobile confirmations enabled. Items will be held for <b>" + hours + "</b> hours.)</div>");
+            jQuery("div.trade_partner_headline")
+                .append(
+                    `<div class='warning'>
+                        (Other user does not have mobile confirmations enabled.
+                        Items will be held for <b>${hours}</b> hours.)
+                    </div>`
+                );
         }
 
 
         // Added url parameter to automatically add some currency on your or the other trader's side
-        // The parameters are "enhancerAddCurrencySelf" and "enhancerAddCurrencyOther", the format is:
+        // The parameters are "enhancerAddCurrencySelf" and "enhancerAddCurrencyPartner", the format is:
         //     comma-separated currencies, e.g. "...&enhancerAddCurrencySelf=1key,3.44ref&..."
         //     Supported currencies: "key", "ref", "rec", "scrap"
         //
@@ -749,16 +811,13 @@ jQuery(function () {
             rec: 5001,
             scrap: 5000,
         }
-        // TODO allow for e.g. "4.33ref" (though this is handled by the bptf integration anyway)
+        // TODO allow for e.g. "4.33ref"? (though this is handled by the bptf integration anyway)
 
         const enhancerAddCurrencySelfParam = getUrlParameter("enhancerAddCurrencySelf");
-        const enhancerAddCurrencyOtherParam = getUrlParameter("enhancerAddCurrencyOther");
+        const enhancerAddCurrencyPartnerParam = getUrlParameter("enhancerAddCurrencyPartner");
 
         // If any of the above url parameters are present, prepare to load the currencies
-        if (enhancerAddCurrencySelfParam || enhancerAddCurrencyOtherParam) {
-
-            const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
-
+        if (enhancerAddCurrencySelfParam || enhancerAddCurrencyPartnerParam) {
             let missingCurrencyAmount = {
                 key: 0,
                 ref: 0,
@@ -766,17 +825,6 @@ jQuery(function () {
                 scrap: 0,
             };
             let hadMissingCurrencyDuringLoad = false;
-
-            function constructMissingCurrencyString () {
-                const missingCurrencyArray = [];
-                for (let [key, value] of Object.entries(missingCurrencyAmount)) {
-                    if (value > 0) {
-                        missingCurrencyArray.push(`${value} ${key}`);
-                    }
-                }
-
-                return missingCurrencyArray.join(", ");
-            }
 
             /*
              UI ELEMENTS
@@ -818,7 +866,9 @@ jQuery(function () {
                 jQuery(".autoadd-status-container .status")
                   .removeClass("waiting in-progress done")
                   .addClass("error")
-                  .text(`not enough items (missing ${constructMissingCurrencyString()})!`);
+                  .text(
+                      `not enough items (missing ${constructMissingCurrencyString(missingCurrencyAmount)})!`
+                  );
             }
 
             function autoAddFinish() {
@@ -830,7 +880,9 @@ jQuery(function () {
                     jQuery(".autoadd-status-container .status")
                       .removeClass("in-progress error")
                       .addClass("done-error")
-                      .text(`done (missing ${constructMissingCurrencyString()})!`)
+                      .text(
+                          `done (missing ${constructMissingCurrencyString(missingCurrencyAmount)})!`
+                      )
                 } else {
                     autoAddUIStatus = "done";
                     jQuery(".autoadd-status-container .status")
@@ -848,11 +900,8 @@ jQuery(function () {
             function processNextMatch(array, index, signalFinishedOnEnd, finishedCallback) {
                 if (index >= array.length) {
                     if (signalFinishedOnEnd) {
-                        // Clear the search bar
-                        setItemSearchAndUpdate("");
                         autoAddFinish();
                     }
-
                     if (finishedCallback) {
                         finishedCallback();
                     }
@@ -860,10 +909,11 @@ jQuery(function () {
                     return;
                 }
 
+                // Process the currency described at the current index
                 try {
                     let matched = array[index].match(currencyRegex);
                     if (matched === null || matched.length !== 3) {
-                        logger.warn("Format was not recognized: " + array[index]);
+                        logger.warn("Currency format was not recognized: " + array[index]);
                         return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
@@ -872,7 +922,7 @@ jQuery(function () {
 
                     const currencyDefindex = currencyDefindexes[currencyType];
                     if (currencyDefindex === undefined) {
-                        logger.warn("Format was not recognized: " + array[index]);
+                        logger.warn("Currency format was not recognized: " + array[index]);
                         return processNextMatch(array, index + 1, signalFinishedOnEnd, finishedCallback);
                     }
 
@@ -891,7 +941,7 @@ jQuery(function () {
                         return defIndex === currencyDefindex;
                     });
 
-                    // Warn the user if not enough users
+                    // Warn the user if they do not have enough items
                     if (currencyAmount > matchingLoadedItems.length) {
                         let missingAmount = currencyAmount - matchingLoadedItems.length;
                         missingCurrencyAmount[currencyType] += missingAmount;
@@ -918,7 +968,7 @@ jQuery(function () {
             }
 
             autoAddSetUp();
-            logger.info("enhancerAddCurrency(Self/Other) is present, watiting for inventory...");
+            logger.info("enhancerAddCurrency(Self/Partner) is present, watiting for inventory...");
 
             let autoAddSelfInventory = null;
             if (enhancerAddCurrencySelfParam) {
@@ -929,8 +979,8 @@ jQuery(function () {
             }
 
             let autoAddOtherInventory = null;
-            if (enhancerAddCurrencyOtherParam) {
-                autoAddOtherInventory = enhancerAddCurrencyOtherParam.split(",");
+            if (enhancerAddCurrencyPartnerParam) {
+                autoAddOtherInventory = enhancerAddCurrencyPartnerParam.split(",");
             }
             let autoAddOtherFocusFunc = function() {
                 jQuery("#inventory_select_their_inventory").click();
@@ -967,7 +1017,6 @@ jQuery(function () {
 
             const myInventoryAvailableObserver = new MutationObserver(function () {
                 if (isInventoryListReady(mySteamID, appID)) {
-                    console.log(collectSearchedItems());
                     myInventoryAvailableObserver.disconnect();
                     logger.success("User inventory is available, running auto-add.");
 

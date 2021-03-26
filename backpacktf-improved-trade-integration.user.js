@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name        Backpack.tf Steam Trade Offer Enhancer
 // @namespace   https://github.com/DefaultSimon
-// @description An integration with my patched version of HusKy's Steam Trade Offer Enhancer. Automatically adds the required amount of currency on your side.
+// @description An integration with Improved HusKy's Steam Trade Offer Enhancer. Automatically adds the required amount of currency on your side.
 // @include     https://backpack.tf/classifieds*
 // @include     https://backpack.tf/stats/*
 // @version     1.0.0
 // @author      DefaultSimon
-// @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
+// @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js
 // @run-at      document-idle
 // ==/UserScript==
 

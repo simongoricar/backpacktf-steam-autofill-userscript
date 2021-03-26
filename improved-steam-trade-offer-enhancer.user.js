@@ -1,20 +1,19 @@
 // ==UserScript==
-// @name        Steam Trade Offer Enhancer
-// @namespace   http://steamcommunity.com/id/H_s_K/
-// @description Browser script to enhance Steam trade offers.
+// @name        Improved Steam Trade Offer Enhancer
+// @namespace   https://github.com/DefaultSimon
+// @description Userscript to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.4.2-patch2
-// @author      HusKy, patches by DefaultSimon
-// @downloadURL https://forums.backpack.tf/topic/17946-script-steam-trade-offer-enhancer/
-// @downloadURL https://gist.github.com/DefaultSimon/571fe1a9839014cf8db6757c6a4bd19d
+// @version     1.5
+// @author      HusKy, improvements by DefaultSimon
+// @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @run-at      document-idle
 // ==/UserScript==
 
 /// CHANGELOG
-// 1.4.2-patch2
+// 1.5
 //  - Clean up the code a bit
-//  - TODO warn the user where there are not enough items
+//  - Added a warning if the user doesn't have enough items (during auto-fill or manually)
 //
 //
 // 1.4.2-patch1

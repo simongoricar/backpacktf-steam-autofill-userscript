@@ -1,7 +1,7 @@
 # backpacktf-steam-autofill-userscript
 <div>
     <img alt="Improved Steam Trade Offer Enhancer" src="https://img.shields.io/static/v1?label=Improved%20Steam%20Trade%20Offer%20Enhancer%20version&message=1.4.2-patch2&style=flat-square&color=9B9030">
-    <img alt="backpack.tf Integration" src="https://img.shields.io/static/v1?label=backpack.tf%20Integration%20version&message=1.0.0&style=flat-square&color=8C71BF">
+    <img alt="backpack.tf Auto-fill Integration" src="https://img.shields.io/static/v1?label=backpack.tf%20Integration%20version&message=1.0.0&style=flat-square&color=8C71BF">
 </div>
 
 A pair of userscripts meant to ease **Steam** (more specifically **TF2**) **trading**. **Autofills currencies (keys, ref, reclaimed, scrap) for [bacpack.tf](https://backpack.tf) orders in the Steam new trade offer window.**
@@ -17,7 +17,7 @@ To install these two userscripts, use a userscript manager like [Tampermonkey](h
         <img alt="Install Improved Steam Trade Offer Enhancer" src="https://img.shields.io/static/v1?label=install&message=Improved%20Steam%20Trade%20Offer%20Enhancer&style=for-the-badge&color=4386bc">
     </a>
     <a href="https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/backpacktf-improved-trade-integration.user.js">
-        <img alt="Install backpack.tf Integration" src="https://img.shields.io/static/v1?label=install&message=backpack.tf%20Auto-fill%20Integration&style=for-the-badge&color=C76F38">
+        <img alt="Install backpack.tf Auto-fill Integration" src="https://img.shields.io/static/v1?label=install&message=backpack.tf%20Auto-fill%20Integration&style=for-the-badge&color=C76F38">
     </a>
 </div>
 

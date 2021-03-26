@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        Backpack.tf Steam Trade Offer Enhancer
+// @name        backpack.tf Auto-fill Integration
 // @namespace   https://github.com/DefaultSimon
 // @description An integration with Improved HusKy's Steam Trade Offer Enhancer. Automatically adds the required amount of currency on your side.
 // @include     https://backpack.tf/classifieds*

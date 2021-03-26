@@ -15,6 +15,7 @@
 // 1.5.2
 //  - Huge improvement to the auto-add speed! (doesn't manually search anymore)
 //  - Renamed auto-add parameters: now "enhancerAddCurrencySelf" and "enhancerAddCurrencyPartner".
+//  - Added: when loading a page with auto-add, disable the inventory UI while the script is auto-adding
 //
 // 1.5.1
 //  - Fix auto-add status not showing properly
@@ -232,6 +233,7 @@ const style =
         margin-left: 1px;
         position: relative;
         top: 6px;
+        user-select: none;
     }
 
     .autoadd-status-container .status {
@@ -253,6 +255,34 @@ const style =
     .autoadd-status-container .status.done-error {
         color: rgb(186,191,41);
     }
+
+    .autoadd-inventory-disabled {
+        pointer-events: none;
+    }
+
+    .autoadd-inventory-disabled::before {
+        content: "";
+        display: block;
+        position: absolute;
+
+        width: calc(100% + 2px);
+        height: calc(100% + 2px);
+
+        background-color: rgba(1, 1, 1, 0.65);
+        top: -1px;
+        bottom: -1px;
+        left: -1px;
+        right: -1px;
+
+        z-index: 1000;
+    }
+
+    /* Quick fixes for the absolute styling above */
+    .inventory_user_tabs.autoadd-inventory-disabled,
+    #inventory_pagecontrols.autoadd-inventory-disabled {
+        position: relative;
+    }
+
 </style>`;
 
 const tradeBoxAfterHTML =
@@ -319,6 +349,46 @@ function constructMissingCurrencyString (missingCurrencyAmountObject) {
     return missingCurrencyArray.join(", ");
 }
 
+/**
+ * This will (both visibly and usably) disable:
+ * - "Your/Their Inventory" buttons
+ * - the inventory contents box
+ */
+function disableInventoryUI () {
+    const elementsToDisable = {
+        userTabsElement: document.querySelector(".inventory_user_tabs"),
+        appSelectElement: document.getElementById("appselect"),
+        inventoriesElement: document.getElementById("inventories"),
+        inventoryPageControlsElement: document.getElementById("inventory_pagecontrols"),
+    };
+
+    // Set "pointer-events: none" and darken all of them
+    // (add "autoadd-inventory-disabled" class)
+    Object.entries(elementsToDisable).forEach(
+        function (entry) {
+            entry[1].classList.add("autoadd-inventory-disabled");
+        }
+    );
+    logger.info(`Disabled UI elements: ${Object.keys(elementsToDisable).join(", ")}`)
+}
+
+
+function enableInventoryUI () {
+    const elementsToDisable = {
+        userTabsElement: document.querySelector(".inventory_user_tabs"),
+        appSelectElement: document.getElementById("appselect"),
+        inventoriesElement: document.getElementById("inventories"),
+        inventoryPageControlsElement: document.getElementById("inventory_pagecontrols"),
+    };
+
+    // Remove "autoadd-inventory-disabled" class
+    Object.entries(elementsToDisable).forEach(
+        function (entry) {
+            entry[1].classList.remove("autoadd-inventory-disabled");
+        }
+    );
+    logger.success(`Enabled UI elements: ${Object.keys(elementsToDisable).join(", ")}`)
+}
 
 const tradeOfferPage = {
     evaluate_items: function (items) {
@@ -844,6 +914,9 @@ jQuery(function () {
 
                 // Also disable the search bar so the user can't accidentally type something
                 jQuery(".filter_control_ctn input").prop("disabled", true);
+
+                // Disable the inventory UI
+                disableInventoryUI();
             }
 
             function autoAddInProgress() {
@@ -873,8 +946,8 @@ jQuery(function () {
 
             function autoAddFinish() {
                 logger.success("Auto-adder DONE.");
-                // Update the status
 
+                // Update the status
                 if (hadMissingCurrencyDuringLoad) {
                     autoAddUIStatus = "done-error";
                     jQuery(".autoadd-status-container .status")
@@ -895,6 +968,9 @@ jQuery(function () {
                 jQuery(".filter_control_ctn input").prop("disabled", false);
                 // Show the bump animation
                 jQuery(".filter_control_ctn").addClass("finishedAnimation");
+
+                // Re-enable the inventory UI
+                enableInventoryUI();
             }
 
             function processNextMatch(array, index, signalFinishedOnEnd, finishedCallback) {
@@ -1062,6 +1138,8 @@ jQuery(function () {
                 }
             });
 
+            // Connect the MutationObserver(s)
+            // This will make sure the auto-adding begins as soon as the inventory is loaded
             connectObserver(myInventoryAvailableObserver);
             connectObserver(otherInventoryAvailableObserver);
 

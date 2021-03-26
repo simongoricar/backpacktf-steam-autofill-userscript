@@ -137,9 +137,14 @@ let rare_TF2_keys = [
     "5762"
 ];
 
+// TODO make this dynamic (more resilient to change)
+const steamImageRefined = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO1Mv6NGucF1Ygzt8ZQijJukFMiMrbhYDEwI1yRVKNfD6xorQ3qW3Jr6546DNPuou9IOVK4p4kWJaA/96fx96f";
+const steamImageReclaimed = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO0Mv6NGucF1YJlscMEgDdvxVYsMLPkMmFjI1OSUvMHDPBp9lu0CnVluZQxA9Gwp-hIOVK4sMMNWF4/96fx96f";
+const steamImageScrap = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsPZAfOeD-VOn4phtsdQ32ZtxFYoN7PkYmVmIgeaUKNaX_Rjpwy8UHMz6pcxAIfnovUWJ1t9nYFqYw/96fx96f";
+
 const style =
 `<style type="text/css">
-    .tradeoffer_items_summary {
+    .enhanced-trade-offer_summary {
         color: #fff;
         font-size: 10px;
     }
@@ -178,22 +183,38 @@ const style =
         font-size: 12px;
     }
 
-    .btn_custom {
+    #amount_control {
+        padding-left: 8px;
+    }
+
+    .enhanced-trade-offer_btn {
         border-width: 0;
-        background-color: black;
         border-radius: 2px;
-        font-family: Arial, serif;
+        padding: 3px 14px;
+
+        background-color: black;
         color: white;
-        line-height: 20px;
+
         font-size: 12px;
-        padding: 0 15px;
-        vertical-align: middle;
+        line-height: 20px;
         cursor: pointer;
+        vertical-align: middle;
+    }
+
+    .enhanced-trade-offer_btn.big {
+        font-size: 14px;
+        padding: 2px 14px;
     }
 
     #headingAddMultipleItems {
         margin-bottom: 4px;
         margin-left: 2px;
+    }
+
+    .enhanced-trade-offer_btn-container {
+        margin-top: 8px;
+        margin-left: 1px;
+        font-size: 13px;
     }
 
     .item_adder #btn_additems {
@@ -216,7 +237,7 @@ const style =
 
     @keyframes autoAddFinished {
         0% { transform: scale(1) }
-        60% { transform: scale(1.1) }
+        60% { transform: scale(1.15) }
         100% { transform: scale(1) }
     }
 
@@ -291,14 +312,23 @@ const tradeBoxAfterHTML =
     <div class="item_adder">
         <div id="headingAddMultipleItems" class="selectableNone">Add multiple items:</div>
         <input id="amount_control" class="filter_search_box" type="text" placeholder="16">
-        <button id="btn_additems" type="button" class="btn_custom">Add</button>
-        <div id="itemcount-warning" style="font-size: 0.9rem"></div>
+        <button id="btn_additems" type="button" class="enhanced-trade-offer_btn big">Add</button>
+        <br>
+
+        <div class="enhanced-trade-offer_btn-container">
+            <button id="btn_additems-ref" type="button" class="enhanced-trade-offer_btn">Add ref</button>
+            <button id="btn_additems-rec" type="button" class="enhanced-trade-offer_btn">Add reclaimed</button>
+            <button id="btn_additems-scrap" type="button" class="enhanced-trade-offer_btn">Add scrap</button>
+        </div>
+
+        <div id="itemcount-warning"></div>
         <br><br>
-        <button id="btn_clearmyitems" type="button" class="btn_custom">Clear my items</button>
-        <button id="btn_cleartheiritems" type="button" class="btn_custom">Clear their items</button>
+
+        <button id="btn_clearmyitems" type="button" class="enhanced-trade-offer_btn">Clear my items</button>
+        <button id="btn_cleartheiritems" type="button" class="enhanced-trade-offer_btn">Clear their items</button>
     </div>
     <div class="trade_rule selectableNone"></div>
-    <div class="tradeoffer_items_summary"></div>
+    <div class="enhanced-trade-offer_summary"></div>
 `;
 
 const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
@@ -313,11 +343,17 @@ const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
 function collectSearchedItems () {
     let inventory = jQuery("div.inventory_ctn:visible");
 
-    return inventory.find("div.itemHolder").filter(function () {
-        return jQuery(this).css("display") !== "none";
-    }).find("div.item").filter(function () {
-        return jQuery(this).css("display") !== "none";
-    });
+    return inventory
+        .find("div.itemHolder")
+        .filter(function () {
+            return jQuery(this).css("display") !== "none";
+            }
+        )
+        .find("div.item")
+        .filter(function () {
+            return jQuery(this).css("display") !== "none";
+            }
+        );
 }
 
 /**
@@ -440,7 +476,7 @@ const tradeOfferPage = {
         htmlString += "<br><br>Items:<br>";
         tradeoffer
           .find(`div.${type} > div.tradeoffer_items_header`)
-          .after(`<div class="tradeoffer_items_summary">${htmlString}</div>`);
+          .after(`<div class="enhanced-trade-offer_summary">${htmlString}</div>`);
     },
 
     attach_links: function (tradeoffer) {
@@ -596,7 +632,7 @@ const tradeOfferWindow = {
     },
 
     summarise: function () {
-        let target = jQuery("div.tradeoffer_items_summary");
+        let target = jQuery("div.enhanced-trade-offer_summary");
         target.html("");
 
         let mine = jQuery("div#your_slots");
@@ -795,6 +831,7 @@ jQuery(function () {
          * Will not return anything, but will update the UI accordingly.
          */
         function verifyUserHasEnoughItems () {
+            // 1) Verify enough items as searched
             const items = collectSearchedItems();
             const amountWanted = getAddItemButtonAmount() || 0;
 

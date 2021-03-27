@@ -1,6 +1,6 @@
 # backpacktf-steam-autofill-userscript
 <div>
-    <img alt="Improved Steam Trade Offer Enhancer" src="https://img.shields.io/static/v1?label=Improved%20Steam%20Trade%20Offer%20Enhancer%20version&message=1.5.3&style=flat-square&color=9B9030">
+    <img alt="Improved Steam Trade Offer Enhancer" src="https://img.shields.io/static/v1?label=Improved%20Steam%20Trade%20Offer%20Enhancer%20version&message=1.5.4&style=flat-square&color=9B9030">
     <img alt="backpack.tf Auto-fill Integration" src="https://img.shields.io/static/v1?label=backpack.tf%20Integration%20version&message=1.0.2&style=flat-square&color=8C71BF">
 </div>
 

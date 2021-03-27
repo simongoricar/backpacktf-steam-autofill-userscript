@@ -14,6 +14,7 @@
 /// CHANGELOG
 // 1.5.3
 //  - Add "Add keys/ref/rec/scrap" buttons for quickly adding pure currencies
+//  - Optimizations and UI improvements
 //
 //
 // 1.5.2
@@ -142,6 +143,7 @@ let rare_TF2_keys = [
 ];
 
 // TODO make this dynamic (more resilient to change)
+const steamImageKeys = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEAaR4uURrwvz0N252yVaDVWrRTno9m4ccG2GNqxlQoZrC2aG9hcVGUWflbX_drrVu5UGki5sAij6tOtQ/96fx96f";
 const steamImageRefined = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO1Mv6NGucF1Ygzt8ZQijJukFMiMrbhYDEwI1yRVKNfD6xorQ3qW3Jr6546DNPuou9IOVK4p4kWJaA/96fx96f";
 const steamImageReclaimed = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsO0Mv6NGucF1YJlscMEgDdvxVYsMLPkMmFjI1OSUvMHDPBp9lu0CnVluZQxA9Gwp-hIOVK4sMMNWF4/96fx96f";
 const steamImageScrap = "https://community.akamai.steamstatic.com/economy/image/fWFc82js0fmoRAP-qOIPu5THSWqfSmTELLqcUywGkijVjZULUrsm1j-9xgEbZQsUYhTkhzJWhsPZAfOeD-VOn4phtsdQ32ZtxFYoN7PkYmVmIgeaUKNaX_Rjpwy8UHMz6pcxAIfnovUWJ1t9nYFqYw/96fx96f";
@@ -194,7 +196,7 @@ const style =
     .enhanced-trade-offer_btn {
         border-width: 0;
         border-radius: 2px;
-        padding: 3px 14px;
+        padding: 3px 11px;
 
         background-color: black;
         color: white;
@@ -216,9 +218,38 @@ const style =
     }
 
     .enhanced-trade-offer_btn-container {
-        margin-top: 8px;
+        margin-top: 4px;
         margin-left: 1px;
         font-size: 13px;
+    }
+
+    .enhanced-trade-offer_btn-wrapper {
+        display: inline-block;
+    }
+
+    .enhanced-trade-offer_btn:not(.big) {
+        margin-top: 4px;
+
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+    }
+
+    .enhanced-trade-offer_btn img {
+        height: 20px;
+        width: auto;
+    }
+
+    .enhanced-trade-offer_btn .btn_text {
+        margin-left: 8px;
+    }
+
+    .enhanced-trade-offer_btn .btn_secondary-text {
+        margin-left: 5px;
+        opacity: 0.55;
+        /* Two digits */
+        min-width: 18px;
+        display: inline-block;
     }
 
     #btn_additems {
@@ -320,23 +351,63 @@ const tradeBoxAfterHTML =
         <br>
 
         <div class="enhanced-trade-offer_btn-container">
-            <button id="btn_additems-keys" type="button" class="enhanced-trade-offer_btn">Add keys</button>
-            <button id="btn_additems-ref" type="button" class="enhanced-trade-offer_btn">Add ref</button>
-            <button id="btn_additems-rec" type="button" class="enhanced-trade-offer_btn">Add reclaimed</button>
-            <button id="btn_additems-scrap" type="button" class="enhanced-trade-offer_btn">Add scrap</button>
+            <span class="enhanced-trade-offer_btn-wrapper">
+                <button id="btn_additems-keys" type="button" class="enhanced-trade-offer_btn">
+                    <img alt="Keys" src="${steamImageKeys}">
+                    <span class="btn_text">Add keys</span>
+                    <sup class="btn_secondary-text">(<span id="btn_additems-keys-left">?</span> left)</sup>
+                </button>
+            </span>
+            <span class="enhanced-trade-offer_btn-wrapper">
+                <button id="btn_additems-ref" type="button" class="enhanced-trade-offer_btn">
+                    <img alt="Refined" src="${steamImageRefined}">
+                    <span class="btn_text">Add ref</span>
+                    <sup class="btn_secondary-text">(<span id="btn_additems-ref-left">?</span> left)</sup>
+                </button>
+            </span>
+
+            <br>
+
+            <span class="enhanced-trade-offer_btn-wrapper">
+                <button id="btn_additems-rec" type="button" class="enhanced-trade-offer_btn">
+                    <img alt="Reclaimed" src="${steamImageReclaimed}">
+                    <span class="btn_text">Add reclaimed</span>
+                    <sup class="btn_secondary-text">(<span id="btn_additems-rec-left">?</span> left)</sup>
+                </button>
+            </span>
+            <span class="enhanced-trade-offer_btn-wrapper">
+                <button id="btn_additems-scrap" type="button" class="enhanced-trade-offer_btn">
+                    <img alt="Scrap" src="${steamImageScrap}">
+                    <span class="btn_text">Add scrap</span>
+                    <sup class="btn_secondary-text">(<span id="btn_additems-scrap-left">?</span> left)</sup>
+                </button>
+            </span>
         </div>
 
         <div id="itemcount-warning"></div>
         <br><br>
 
-        <button id="btn_clearmyitems" type="button" class="enhanced-trade-offer_btn">Clear my items</button>
-        <button id="btn_cleartheiritems" type="button" class="enhanced-trade-offer_btn">Clear their items</button>
+
+        <span class="enhanced-trade-offer_btn-wrapper">
+            <button id="btn_clearmyitems" type="button" class="enhanced-trade-offer_btn">Clear my items</button>
+        </span>
+        <span class="enhanced-trade-offer_btn-wrapper">
+            <button id="btn_cleartheiritems" type="button" class="enhanced-trade-offer_btn">Clear their items</button>
+        </span>
     </div>
     <div class="trade_rule selectableNone"></div>
     <div class="enhanced-trade-offer_summary"></div>
 `;
 
 const currencyRegex = /^(\d+(?:\.\d+)?)([a-zA-Z]+)$/i;
+
+const currencyDefindexes = {
+    // https://wiki.alliedmods.net/Team_Fortress_2_Item_Definition_Indexes
+    key: 5021,
+    ref: 5002,
+    rec: 5001,
+    scrap: 5000,
+}
 
 /*
  * USEFUL FUNCTIONS
@@ -445,6 +516,17 @@ function enableInventoryUI () {
         }
     );
     logger.success(`Enabled UI elements: ${Object.keys(elementsToDisable).join(", ")}`)
+}
+
+/**
+ * This function will wrap the passed function with debounce.
+ */
+function withDebounce(func, timeout) {
+    let debounceTimeout;
+    return function () {
+        clearTimeout(debounceTimeout);
+        debounceTimeout = setTimeout(func, timeout);
+    }
 }
 
 const tradeOfferPage = {
@@ -793,13 +875,8 @@ jQuery(function () {
         // Refresh summaries on any user interaction
         // Added debounce for a performance improvement
         // This way, the summary will be drawn after 300ms of idle time (no clicks)
-        let debounceTimeout;
-        jQuery("body").click(function () {
-            clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(function () {
-                tradeOfferWindow.summarise();
-            }, 300);
-        });
+        const bodyElement = jQuery("body");
+        bodyElement.click(withDebounce(tradeOfferWindow.summarise, 300));
 
         // hack to fix empty space under inventory
         // TODO get rid of this if they ever fix it
@@ -816,12 +893,23 @@ jQuery(function () {
         }, 500);
 
         // Handle item auto adder
+        const inventoryUserTabMyInventoryElement = jQuery("#inventory_select_your_inventory");
+        const inventoryUserTabTheirInventoryElement = jQuery("#inventory_select_their_inventory");
+
         const btnAddItemsElement = jQuery("button#btn_additems");
         const btnAddKeysElement = jQuery("button#btn_additems-keys");
         const btnAddRefElement = jQuery("button#btn_additems-ref");
         const btnAddRecElement = jQuery("button#btn_additems-rec");
         const btnAddScrapElement = jQuery("button#btn_additems-scrap");
         const amountControlElement = jQuery("input#amount_control");
+
+        const btnAddKeysLeftElement = jQuery("#btn_additems-keys-left");
+        const btnAddRefLeftElement = jQuery("#btn_additems-ref-left");
+        const btnAddRecLeftElement = jQuery("#btn_additems-rec-left");
+        const btnAddScrapLeftElement = jQuery("#btn_additems-scrap-left");
+
+        const itemCountWarningElement = jQuery("#itemcount-warning");
+
 
         function addItemsToTrade(itemArray, amount) {
             // Add the correct amount of items
@@ -883,6 +971,9 @@ jQuery(function () {
             addItemsToTrade(inventoryItems, amount);
         });
 
+        /*
+         * Add button UI functions
+         */
         function enableAddButton(buttonElement) {
             buttonElement.removeClass("warning");
             buttonElement.prop("disabled", false);
@@ -904,17 +995,14 @@ jQuery(function () {
             const filteredItemsAmount = collectFilteredInventoryItems(selectedInventoryArray).length;
             const amountWanted = getAddItemButtonAmount(0);
 
-            const btnAddItemsElement = jQuery(".item_adder #btn_additems");
-            const ItemCountWarningElement = jQuery("#itemcount-warning");
-
             if (amountWanted > filteredItemsAmount) {
                 disableAddButton(btnAddItemsElement);
-                ItemCountWarningElement.html(
+                itemCountWarningElement.html(
                     `<b>Warning:</b> you only have <b>${filteredItemsAmount}</b> items of this type!`
                 );
             } else {
                 enableAddButton(btnAddItemsElement);
-                ItemCountWarningElement.text("");
+                itemCountWarningElement.text("");
             }
 
             // 2) Verify enough key/ref/rec/scrap in inventory for the corresponding buttons
@@ -922,6 +1010,11 @@ jQuery(function () {
             const refAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.ref).length;
             const recAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.rec).length;
             const scrapAmount = collectInventoryItemsWithDefindex(selectedInventoryArray, currencyDefindexes.scrap).length;
+
+            btnAddKeysLeftElement.text(keysAmount);
+            btnAddRefLeftElement.text(refAmount);
+            btnAddRecLeftElement.text(recAmount);
+            btnAddScrapLeftElement.text(scrapAmount);
 
             enableAddButton(btnAddKeysElement);
             enableAddButton(btnAddRefElement);
@@ -942,8 +1035,33 @@ jQuery(function () {
             }
         }
 
-        amountControlElement.keyup(verifyUserHasEnoughItems);
-        amountControlElement.change(verifyUserHasEnoughItems);
+        // Set up functions for multiple MutationObservers to run when the inventory on both sides is loaded
+        const inventoryStatusElement = document.getElementById("trade_inventory_unavailable");
+        function connectObserver (mutationObserver) {
+            mutationObserver.observe(
+                inventoryStatusElement,
+                {
+                    attributes: true,
+                }
+            )
+        }
+
+        function runVerifyUserHasEnoughItemsIfInventoryReady() {
+            const inventoryStatusNotLoading = inventoryStatusElement.style.display === "none";
+            if (inventoryStatusNotLoading) {
+                verifyUserHasEnoughItems();
+            }
+        }
+
+        amountControlElement.keyup(runVerifyUserHasEnoughItemsIfInventoryReady);
+        amountControlElement.change(runVerifyUserHasEnoughItemsIfInventoryReady);
+        bodyElement.click(withDebounce(runVerifyUserHasEnoughItemsIfInventoryReady, 80));
+        inventoryUserTabMyInventoryElement.click(withDebounce(runVerifyUserHasEnoughItemsIfInventoryReady, 50));
+        inventoryUserTabTheirInventoryElement.click(withDebounce(runVerifyUserHasEnoughItemsIfInventoryReady, 50));
+
+
+        const inventoryChangeObserver = new MutationObserver(runVerifyUserHasEnoughItemsIfInventoryReady);
+        connectObserver(inventoryChangeObserver);
 
         jQuery("button#btn_clearmyitems").click(function () {
             tradeOfferWindow.clear("div#your_slots");
@@ -1001,14 +1119,6 @@ jQuery(function () {
         // Usage: loading the trade offer page with this parameter set will add
         // the specified amount of currency to your/your trade partner's side automatically.
         // Combine with the backpack.tf integration for maximum efficiency ;)
-
-        const currencyDefindexes = {
-            // https://wiki.alliedmods.net/Team_Fortress_2_Item_Definition_Indexes
-            key: 5021,
-            ref: 5002,
-            rec: 5001,
-            scrap: 5000,
-        }
         // TODO allow for e.g. "4.33ref"? (though this is handled by the bptf integration anyway)
 
         const enhancerAddCurrencySelfParam = getUrlParameter("enhancerAddCurrencySelf");
@@ -1177,18 +1287,6 @@ jQuery(function () {
             }
             let autoAddOtherFocusFunc = function() {
                 jQuery("#inventory_select_their_inventory").click();
-            }
-
-            // Set up two MutationObservers to run when the inventory on both sides is loaded
-            const inventoryStatusElement = document.getElementById("trade_inventory_unavailable");
-
-            function connectObserver (mutationObserver) {
-                mutationObserver.observe(
-                  inventoryStatusElement,
-                  {
-                      attributes: true,
-                  }
-                )
             }
 
             const mySteamID = g_steamID;

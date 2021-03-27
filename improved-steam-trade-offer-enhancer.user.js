@@ -14,6 +14,8 @@
 /// CHANGELOG
 // 1.5.4
 //  - Fix summary dissapearing on click
+//  - Fix key/ref/rec/scrap UI showing incorrectly
+//  - Fix key/ref/rec/scrap UI counters not updating
 //
 // 1.5.3
 //  - Add "Add keys/ref/rec/scrap" buttons for quickly adding pure currencies
@@ -928,6 +930,7 @@ jQuery(function () {
             setTimeout(function () {
                 // Refresh summaries
                 tradeOfferWindow.summarise();
+                runVerifyUserHasEnoughItemsIfInventoryReady();
             }, amount * 50 + 500);
         }
 
@@ -998,7 +1001,7 @@ jQuery(function () {
 
             // 1) Verify enough items as searched
             const filteredItemsAmount = collectFilteredInventoryItems(selectedInventoryArray).length;
-            const amountWanted = getAddItemButtonAmount(0);
+            const amountWanted = getAddItemButtonAmount(16);
 
             if (amountWanted > filteredItemsAmount) {
                 disableAddButton(btnAddItemsElement);

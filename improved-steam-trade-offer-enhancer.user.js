@@ -4,7 +4,7 @@
 // @description Userscript to enhance Steam trade offers.
 // @include     /^https?:\/\/steamcommunity\.com\/(id|profiles)\/.*\/tradeoffers.*/
 // @include     /^https?:\/\/steamcommunity\.com\/tradeoffer.*/
-// @version     1.5.3
+// @version     1.5.4dev
 // @author      HusKy, improvements by DefaultSimon
 // @updateURL   https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
 // @downloadURL https://raw.githubusercontent.com/DefaultSimon/backpacktf-steam-autofill-userscript/master/improved-steam-trade-offer-enhancer.user.js
@@ -12,6 +12,9 @@
 // ==/UserScript==
 
 /// CHANGELOG
+// 1.5.4
+//  - Fix summary dissapearing on click
+//
 // 1.5.3
 //  - Add "Add keys/ref/rec/scrap" buttons for quickly adding pure currencies
 //  - Optimizations and UI improvements
@@ -876,7 +879,9 @@ jQuery(function () {
         // Added debounce for a performance improvement
         // This way, the summary will be drawn after 300ms of idle time (no clicks)
         const bodyElement = jQuery("body");
-        bodyElement.click(withDebounce(tradeOfferWindow.summarise, 300));
+        bodyElement.click(withDebounce(function () {
+            tradeOfferWindow.summarise();
+        }, 300));
 
         // hack to fix empty space under inventory
         // TODO get rid of this if they ever fix it

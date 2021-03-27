@@ -22,6 +22,6 @@ To install these two userscripts, use a userscript manager like [Tampermonkey](h
 </div>
 
 ## 2. Features & Usage
-`Improved Steam Trade Offer Enhancer` features everything from the latest `1.4.2` *HusKy* version. In addition, it warns the user when trying to add more items than you have available, as well as supports auto-fillling currencies on load by specifying URL parameters, which is in turn used by the backpack.tf integration.
+`Improved Steam Trade Offer Enhancer` features everything from the latest `1.4.2` *HusKy* version. In addition, it warns the user when trying to add more items than you have available, as well as supports auto-fillling currencies on load by specifying URL parameters, which is in turn used by the backpack.tf integration. Another feature is a button shortcut for adding pure (keys/ref/rec/scrap) currencies without having to search them each time.
 
-The `backpack.tf integration` scans [backpack.tf](https://backpack.tf) classifields for required currencies and auto-fills the Steam Trade Offer window when you click on the trade link on the page. Always double check the results, the script is not foolproof!
+The `Backpack.tf Integration` run on [backpack.tf](https://backpack.tf) classifields pages where it scans each one for the requested value and auto-fills the Steam Trade Offer window when/if you click on the trade link on the classifield. Always double check the results, the script is not foolproof!
